@@ -19,6 +19,11 @@ export const NPCS: Record<string, Npc> = {
     forbidden: ["politics", "religion"],
     opening: "Morning! What can I get you? I'm Maya by the way.",
     story: "在伦敦东区长大，大学读了音乐，毕业后回到咖啡店做咖啡师。喜欢在店里放黑胶唱片。",
+    suggestions: [
+      { label: "😈 演示错误句", text: "Yesterday I go to a nice cafe and I meet a friend." },
+      { label: "☕ 点一杯", text: "Can I have a flat white, please?" },
+      { label: "💬 聊工作", text: "Do you like working in a coffee shop?" },
+    ],
     avatarEmoji: "☕",
     sceneImage: "/scenes/coffee.svg",
     accent: "#c2410c",
@@ -41,6 +46,11 @@ export const NPCS: Record<string, Npc> = {
     forbidden: ["politics", "religion"],
     opening: "Hey — you look like someone who notices light. I'm Leo, I shoot around here.",
     story: "自由摄影师，做了十年街头和旅行题材，最近在拍伦敦老城区拆迁前的样子。",
+    suggestions: [
+      { label: "😈 演示错误句", text: "Yesterday I go to a gallery and I see a great photo." },
+      { label: "📷 谈兴趣", text: "I like taking photos of old buildings." },
+      { label: "🎨 表达观点", text: "I think street photography is more interesting than studio work." },
+    ],
     avatarEmoji: "📷",
     sceneImage: "/scenes/street.svg",
     accent: "#1d4ed8",

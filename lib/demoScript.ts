@@ -54,12 +54,47 @@ export const SCRIPTED_TURNS: ScriptedTurn[] = [
   },
   {
     npcId: "maya",
+    keywords: ["coffee shop", "working"],
+    reply:
+      "Most days, yeah! It gets busy but I love it — the regulars make it feel like a small family. Do you have a place like that back home?",
+  },
+  {
+    npcId: "maya",
     keywords: ["travel"],
     reply: "Travelling is the best. Where was the last place you went? Anywhere you'd go back to?",
     inferred: [{ fact: "enjoys travelling", confidence: 0.9, type: "interest" }],
   },
 
   // ── Leo（街头 / 画廊）────────────────────────────────
+  {
+    npcId: "leo",
+    keywords: ["gallery"],
+    reply:
+      "Oh you went to a gallery? Nice — which one? I'd love to hear what caught your eye in there.",
+    correction: {
+      original: "Yesterday I go to a gallery and I see a great photo.",
+      corrected: "Yesterday I went to a gallery and saw a great photo.",
+      errorType: "grammar",
+      explanation: "Yesterday 表示过去，动词要用过去式：go → went，see → saw。",
+      natural: "Yesterday I went to a gallery and saw a great photo there.",
+      addToReview: true,
+    },
+    weaknesses: ["past tense"],
+  },
+  {
+    npcId: "leo",
+    keywords: ["old buildings"],
+    reply:
+      "Old buildings are my favourite subject too — all that texture and history. Which city has the best ones you've shot?",
+    inferred: [{ fact: "likes photographing old buildings", confidence: 0.9, type: "interest" }],
+  },
+  {
+    npcId: "leo",
+    keywords: ["street photography"],
+    reply:
+      "Ha, I'm with you — street keeps you honest, nothing is staged. Studio work feels too controlled for me. What's the last thing you shot on the street?",
+    inferred: [{ fact: "prefers street photography over studio work", confidence: 0.85, type: "interest" }],
+  },
   {
     npcId: "leo",
     keywords: ["photography"],

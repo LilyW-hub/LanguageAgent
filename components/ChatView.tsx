@@ -7,12 +7,6 @@ import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
 import type { ChatMessage, Npc } from "@/lib/types"
 
-const SUGGESTIONS = [
-  { label: "😈 演示错误句", text: "Yesterday I go to a nice cafe and I meet a friend." },
-  { label: "☕ 正常点单", text: "Can I have a flat white, please?" },
-  { label: "📷 谈兴趣", text: "I am really interested in photography and travel." },
-]
-
 export default function ChatView({
   npc,
   messages,
@@ -147,9 +141,9 @@ export default function ChatView({
 
       <footer className="relative border-t border-stone-200 bg-white/85 backdrop-blur px-4 py-3">
         <div className="flex flex-wrap gap-2 mb-2">
-          {SUGGESTIONS.map((item) => (
+          {npc.suggestions.map((item) => (
             <button
-              key={item.label}
+              key={`${npc.id}-${item.label}`}
               type="button"
               onClick={() => setDraft(item.text)}
               className="text-[11px] px-2.5 py-1 rounded-full border border-stone-200 bg-white text-stone-600 hover:border-stone-400"

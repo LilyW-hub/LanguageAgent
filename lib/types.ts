@@ -94,6 +94,8 @@ export interface Npc {
   forbidden: string[]
   opening: string
   story: string
+  /** 该角色场景下的快捷句式（属于人设，不同 NPC 不同） */
+  suggestions: Array<{ label: string; text: string }>
   avatarEmoji: string
   /** 场景背景图（public/scenes 下的 SVG） */
   sceneImage: string
