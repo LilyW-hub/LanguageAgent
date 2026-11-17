@@ -45,7 +45,7 @@ export interface ArchiveCard {
   summary: string
 }
 
-export type TraceAgent = "memory" | "plan" | "tutor" | "npc" | "tool" | "profile"
+export type TraceAgent = "memory" | "plan" | "tutor" | "npc" | "tool" | "reward" | "profile"
 
 export interface TraceStep {
   turn: number
@@ -98,9 +98,22 @@ export interface ReviewItem {
   turn: number
 }
 
+/** 一次交互实际发放的奖励 */
+export interface RewardSummary {
+  /** 累计经验值 */
+  total: number
+  /** 本轮新增经验值 */
+  gained: number
+  /** 等级（每 100 XP 一级） */
+  level: number
+  /** 本轮奖励明细，例如「复习 +10」「档案 +5」 */
+  items: string[]
+}
+
 export interface ChatResponse {
   reply: string
   plan: QuestPlan | null
+  rewards: RewardSummary
   learningObjective: string
   correction: Correction | null
   profileDelta: ProfileDelta | null

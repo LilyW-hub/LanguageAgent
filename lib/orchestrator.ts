@@ -9,12 +9,16 @@ import { executeTool, sanitizeToolCalls, type ToolCall, type ToolResult } from "
 import {
   addCorrection,
   addTrace,
+  addXp,
   advanceQuest,
   applyProfileDelta,
   getHistory,
   getProfile,
   getQuestStep,
   getReplayMode,
+  getXp,
+  isQuestRewarded,
+  markQuestRewarded,
   nextTurn,
   pushTurn,
 } from "./store"
@@ -25,6 +29,7 @@ import type {
   Profile,
   ProfileDelta,
   QuestPlan,
+  RewardSummary,
   TraceStep,
 } from "./types"
 
@@ -247,6 +252,33 @@ export async function* handleChatStream(input: {
 
   applyProfileDelta(profileDelta)
 
+  // ── 奖励：真实发放，UI 显示的是这里算出来的数 ──
+  const rewardItems: string[] = []
+  let xpGained = 0
+
+  if (correction.errorType !== "none") {
+    xpGained += 10
+    rewardItems.push("纠错复习 +10")
+  }
+  if (archiveCard) {
+    xpGained += 5
+    rewardItems.push("收录档案 +5")
+  }
+  if (plan.index >= plan.total - 1 && !isQuestRewarded(npc.id)) {
+    xpGained += 25
+    rewardItems.push(`任务完成 +25`)
+    markQuestRewarded(npc.id)
+  }
+
+  const xpTotal = xpGained > 0 ? addXp(xpGained) : getXp()
+
+  const rewards: RewardSummary = {
+    total: xpTotal,
+    gained: xpGained,
+    level: Math.floor(xpTotal / 100) + 1,
+    items: rewardItems,
+  }
+
   // ── Trace ──
   const inferredCount = profileDelta?.inferred?.length ?? 0
   const weaknessCount = profileDelta?.weaknesses?.length ?? 0
@@ -281,6 +313,16 @@ export async function* handleChatStream(input: {
           ? `${npc.name} 生成回复`
           : `${npc.name} 用 corrected 生成回复（diegetic 纠错）`,
     },
+    ...(xpGained > 0
+      ? [
+          {
+            turn,
+            agent: "reward" as const,
+            action: `发放奖励：${rewardItems.join(" / ")} → 累计 ${xpTotal} XP`,
+            detail: `等级 ${rewards.level}`,
+          },
+        ]
+      : []),
     ...results.map<TraceStep>((result) => ({
       turn,
       agent: "tool",
@@ -316,6 +358,7 @@ export async function* handleChatStream(input: {
     data: {
       reply,
       plan,
+      rewards,
       learningObjective: npc.learningObjective,
       correction: correction.errorType === "none" ? null : correction,
       profileDelta,

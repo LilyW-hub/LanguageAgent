@@ -180,6 +180,18 @@ async function main() {
     errTurn.body.plan ? `${errTurn.body.plan.stepLabel} ${errTurn.body.plan.index + 1}/4` : "无",
   )
 
+  record(
+    "奖励真实发放（XP 与明细）",
+    (errTurn.body.rewards?.gained ?? 0) > 0 && (errTurn.body.rewards?.items?.length ?? 0) > 0,
+    errTurn.body.rewards
+      ? `+${errTurn.body.rewards.gained} (总 ${errTurn.body.rewards.total}) ${errTurn.body.rewards.items.join("、")}`
+      : "无",
+  )
+  record(
+    "Trace 记录奖励发放",
+    (errTurn.body.trace ?? []).some((item) => item.agent === "reward"),
+  )
+
   const cleanTurn = await chat("Can I have a flat white please?")
   record("正确句子：不误报", cleanTurn.body.correction === null, cleanTurn.body.correction?.corrected)
   record(

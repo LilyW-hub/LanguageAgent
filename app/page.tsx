@@ -16,6 +16,7 @@ import type {
   Profile,
   PronunciationFeedback,
   QuestPlan,
+  RewardSummary,
   TraceStep,
 } from "@/lib/types"
 
@@ -58,6 +59,7 @@ export default function Home() {
   const [view, setView] = useState<"map" | "city">("map")
   const [toast, setToast] = useState<string | null>(null)
   const [plans, setPlans] = useState<Record<string, QuestPlan>>({})
+  const [rewards, setRewards] = useState<Record<string, RewardSummary>>({})
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -131,6 +133,7 @@ export default function Home() {
       setMessages({})
       setTrace([])
       setPlans({})
+      setRewards({})
       seedOpening(DEFAULT_NPC_ID)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -227,10 +230,17 @@ export default function Home() {
               if (payload.plan) {
                 setPlans((prev) => ({ ...prev, [targetNpc]: payload.plan as QuestPlan }))
               }
+              if (payload.rewards) {
+                setRewards((prev) => ({ ...prev, [targetNpc]: payload.rewards }))
+              }
               if (payload.correction) setTab("trace")
-              if (payload.archiveCard) {
-                setToast(`📜 收录档案：${payload.archiveCard.title}`)
-                window.setTimeout(() => setToast(null), 2800)
+              if (payload.rewards && payload.rewards.gained > 0) {
+                const bits = [
+                  payload.archiveCard ? `📜 ${payload.archiveCard.title}` : "",
+                  `⭐ +${payload.rewards.gained} XP`,
+                ].filter(Boolean)
+                setToast(bits.join("　·　"))
+                window.setTimeout(() => setToast(null), 3000)
               }
             } else if (parsed.event === "error") {
               const message = (parsed.data as { error?: string }).error ?? "未知错误"
@@ -283,6 +293,7 @@ export default function Home() {
     setMessages({})
     setTrace([])
     setPlans({})
+    setRewards({})
     setNpcId(DEFAULT_NPC_ID)
     setError(null)
     setTab("profile")
@@ -324,7 +335,12 @@ export default function Home() {
     return (
       <>
         {healthBanner}
-        <WorldMap archives={archives.length} onEnterLondon={() => setView("city")} />
+        <WorldMap
+          archives={archives.length}
+          xp={Object.values(rewards)[0]?.total ?? 0}
+          level={Object.values(rewards)[0]?.level ?? 1}
+          onEnterLondon={() => setView("city")}
+        />
       </>
     )
   }
@@ -356,6 +372,7 @@ export default function Home() {
         busy={busy}
         stage={stage}
         plan={plans[npcId] ?? null}
+        rewards={rewards[npcId] ?? null}
         error={error}
       />
 

@@ -16,6 +16,10 @@ interface StoreState {
   reviews: ReviewItem[]
   /** 每个 NPC 的任务推进到第几步 */
   questStep: Record<string, number>
+  /** 累计经验值 */
+  xp: number
+  /** 已经发过完成奖励的 NPC（避免重复发放） */
+  questRewarded: Record<string, boolean>
   /** 回放模式：不调用模型，走 lib/demoScript.ts 的剧本（现场兜底） */
   replay: boolean
 }
@@ -30,6 +34,8 @@ function createStore(): StoreState {
     turn: 0,
     reviews: [],
     questStep: {},
+    xp: 0,
+    questRewarded: {},
     replay: false,
   }
 }
@@ -65,6 +71,8 @@ export function resetStore(): void {
   store.turn = 0
   store.reviews = []
   store.questStep = {}
+  store.xp = 0
+  store.questRewarded = {}
 }
 
 export function currentTurn(): number {
@@ -124,6 +132,23 @@ export function advanceQuest(npcId: string, stepIndex: number): number {
 
 export function getQuestStep(npcId: string): number {
   return store.questStep[npcId] ?? 0
+}
+
+export function addXp(amount: number): number {
+  store.xp += Math.max(0, Math.round(amount))
+  return store.xp
+}
+
+export function getXp(): number {
+  return store.xp
+}
+
+export function isQuestRewarded(npcId: string): boolean {
+  return store.questRewarded[npcId] === true
+}
+
+export function markQuestRewarded(npcId: string): void {
+  store.questRewarded[npcId] = true
 }
 
 export function addTrace(steps: TraceStep[]): void {

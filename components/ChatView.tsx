@@ -9,7 +9,7 @@ import PronunciationCard from "./PronunciationCard"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
 import { assessPronunciation } from "@/lib/pronunciation"
-import type { ChatMessage, Npc, PronunciationFeedback, QuestPlan } from "@/lib/types"
+import type { ChatMessage, Npc, PronunciationFeedback, QuestPlan, RewardSummary } from "@/lib/types"
 
 export default function ChatView({
   npc,
@@ -18,6 +18,7 @@ export default function ChatView({
   busy,
   stage,
   plan,
+  rewards,
   error,
 }: {
   npc: Npc
@@ -28,6 +29,8 @@ export default function ChatView({
   stage: number
   /** 当前任务计划（服务端判定） */
   plan: QuestPlan | null
+  /** 累计经验值 */
+  rewards: RewardSummary | null
   error: string | null
 }) {
   const [draft, setDraft] = useState("")
@@ -87,11 +90,18 @@ export default function ChatView({
               📍 {npc.city} · {npc.sceneLabel}
             </div>
           </button>
-          <div
-            className="text-[11px] px-2 py-1 rounded-full border bg-white/70"
-            style={{ borderColor: npc.accent, color: npc.accent }}
-          >
-            🎯 {npc.learningObjective}
+          <div className="flex items-center gap-2">
+            {rewards && (
+              <div className="text-[11px] px-2 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-800 tabular-nums">
+                ⭐ {rewards.total} XP · Lv.{rewards.level}
+              </div>
+            )}
+            <div
+              className="text-[11px] px-2 py-1 rounded-full border bg-white/70"
+              style={{ borderColor: npc.accent, color: npc.accent }}
+            >
+              🎯 {npc.learningObjective}
+            </div>
           </div>
         </div>
       </header>

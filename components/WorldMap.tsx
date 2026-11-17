@@ -11,9 +11,13 @@ import { CITIES, type CityNode } from "@/lib/world"
  */
 export default function WorldMap({
   archives,
+  xp,
+  level,
   onEnterLondon,
 }: {
   archives: number
+  xp: number
+  level: number
   onEnterLondon: () => void
 }) {
   const [hint, setHint] = useState<string | null>(null)
@@ -66,7 +70,11 @@ export default function WorldMap({
               style={{ width: `${Math.min(100, (archives / goal) * 100)}%` }}
             />
           </div>
-          <div className="mt-2 text-[10px] text-stone-500">
+          <div className="mt-2 flex items-center justify-between text-[10px] text-stone-400">
+            <span>⭐ {xp} XP · Lv.{level}</span>
+            <span>📜 {archives} 张</span>
+          </div>
+          <div className="mt-1 text-[10px] text-stone-500">
             每完成一次「被纠正的表达」，就收录一张档案
           </div>
         </div>

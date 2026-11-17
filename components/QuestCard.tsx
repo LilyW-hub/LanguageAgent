@@ -84,6 +84,11 @@ export default function QuestCard({ npc, plan }: { npc: Npc; plan: QuestPlan | n
               奖励 {npc.quest.reward}
               {completed && " · 已发放"}
             </div>
+            {completed && (
+              <div className="text-[10px] text-emerald-700">
+                ✅ 任务完成，奖励已计入右上角经验值
+              </div>
+            )}
           </div>
         )}
       </div>
