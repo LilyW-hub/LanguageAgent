@@ -24,6 +24,22 @@ export default function Home() {
   const [tab, setTab] = useState<"profile" | "trace">("profile")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [healthError, setHealthError] = useState<string | null>(null)
+
+  // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
+  useEffect(() => {
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: { ok: boolean; error?: string; config?: { baseURL: string; model: string } }) => {
+        if (data.ok) {
+          setHealthError(null)
+          return
+        }
+        const where = data.config ? `${data.config.baseURL} · ${data.config.model}` : ""
+        setHealthError(`${data.error ?? "模型不可用"}${where ? `（${where}）` : ""}`)
+      })
+      .catch(() => setHealthError("无法访问 /api/health，请确认 dev 服务在运行"))
+  }, [])
 
   const seedOpening = useCallback((id: string) => {
     const npc = getNpc(id)
@@ -161,8 +177,19 @@ export default function Home() {
     )
   }
 
+  const healthBanner = healthError ? (
+    <div className="fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white text-xs px-4 py-2 text-center">
+      模型未连通：{healthError}
+    </div>
+  ) : null
+
   if (!profile) {
-    return <Onboarding onSubmit={handleOnboard} busy={busy} />
+    return (
+      <>
+        {healthBanner}
+        <Onboarding onSubmit={handleOnboard} busy={busy} />
+      </>
+    )
   }
 
   const npc = getNpc(npcId)
@@ -171,7 +198,9 @@ export default function Home() {
     .filter((message) => message.archiveCard)
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <>
+      {healthBanner}
+      <div className="h-screen flex overflow-hidden">
       <CitySelect
         npcs={listNpcs()}
         activeId={npcId}
@@ -229,6 +258,7 @@ export default function Home() {
           📜 文明档案员 · demo 版本
         </div>
       </aside>
-    </div>
+      </div>
+    </>
   )
 }

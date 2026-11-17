@@ -8,7 +8,6 @@ import {
   addCorrection,
   addTrace,
   applyProfileDelta,
-  currentTurn,
   getHistory,
   getProfile,
   nextTurn,
@@ -21,6 +20,10 @@ const CITY_LABEL: Record<string, string> = { London: "伦敦" }
 /**
  * Orchestrator：确定性管线（对应技术文档 §2）。
  * 顺序固定为 memory → tutor → npc → profile，保证两层纠错同源。
+ *
+ * 错误策略：
+ * - Tutor / Profile 失败：非致命，对话继续，但 Trace 里显式告警。
+ * - NPC 生成失败：致命，抛出带可执行提示的错误（假回复会掩盖配置问题）。
  */
 export async function handleChat(input: {
   message: string
@@ -45,22 +48,26 @@ export async function handleChat(input: {
   })
 
   // 2) Tutor + Profile Extractor 并行（互不依赖）
-  const [correction, profileDelta] = await Promise.all([
+  const [tutorResult, extractorResult] = await Promise.all([
     runTutor({ userMessage: input.message, level: profile.level }),
     runProfileExtractor({ userMessage: input.message, turn }),
   ])
 
+  const correction = tutorResult.correction
+  const profileDelta = extractorResult.delta
+
   trace.push({
     turn,
     agent: "tutor",
-    action:
-      correction.errorType === "none"
+    action: tutorResult.error
+      ? `⚠️ 纠错不可用：${tutorResult.error}`
+      : correction.errorType === "none"
         ? "未检测到明显错误"
         : `检测到 ${correction.errorType} → corrected "${correction.corrected}"`,
     detail: correction.explanation || undefined,
   })
 
-  // 3) NPC Engine：引用 corrected 生成回复
+  // 3) NPC Engine：引用 corrected 生成回复（失败直接抛出，不做假回复）
   const reply = await runNpcEngine({
     npc,
     profile,
@@ -88,8 +95,9 @@ export async function handleChat(input: {
   trace.push({
     turn,
     agent: "profile",
-    action:
-      inferredCount + weaknessCount === 0
+    action: extractorResult.error
+      ? `⚠️ 画像提取不可用：${extractorResult.error}`
+      : inferredCount + weaknessCount === 0
         ? "无新的画像信号"
         : [
             inferredCount > 0
@@ -129,5 +137,3 @@ export async function handleChat(input: {
     profile,
   }
 }
-
-export { currentTurn }

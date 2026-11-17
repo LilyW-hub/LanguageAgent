@@ -119,9 +119,32 @@ ASR_LANGUAGE=en
 
 ## 故障排查
 
+**先做一步自检**：浏览器打开 <http://localhost:3000/api/health>，它会真的调用一次模型，返回：
+
+```json
+{ "ok": true, "latencyMs": 820, "sample": "pong", "config": { "baseURL": "...", "model": "..." } }
+```
+
+失败时 `ok` 为 `false`，`error` 会直接告诉你原因（认证失败 / 模型不存在 / 超时…）。
+页面顶部也会出现红色横幅提示，不会静默用兜底文案糊弄你。
+
 | 现象 | 处理 |
 |---|---|
-| 「缺少 OPENAI_API_KEY」 | 检查 `.env.local`，改完需重启 `npm run dev` |
-| 一直「正在输入…」 | 端点不通或超时；检查 `OPENAI_BASE_URL`、`MODEL_NAME` |
-| 纠错不出现 | 用「😈 演示错误句」按钮；或检查模型是否支持 JSON 输出 |
+| 顶部红条「认证失败（401）」 | `.env.local` 的 `OPENAI_API_KEY` 无效或仍是占位符 `sk-xxx` |
+| 「端点或模型不存在（404）」 | `OPENAI_BASE_URL` 与 `MODEL_NAME` 不属于同一家服务商（常见错误） |
+| 「缺少 OPENAI_API_KEY」 | 没建 `.env.local`，或建了没重启 `npm run dev` |
+| 一直「正在输入…」 | 端点超时；调大 `LLM_TIMEOUT_MS` 或检查网络/代理 |
+| 纠错不出现，Trace 显示「⚠️ 纠错不可用」 | 模型不支持 JSON 输出；换带 JSON 能力的模型 |
 | 状态错乱 | 点「重置」或 `POST /api/reset` |
+| 页面 500 | `next build` 与 `next dev` 共用 `.next` 互相覆盖；停掉另一个再重启 |
+
+### 端点与模型必须配对
+
+| 服务商 | OPENAI_BASE_URL | MODEL_NAME 示例 |
+|---|---|---|
+| DeepSeek 官方 | `https://api.deepseek.com/v1` | `deepseek-chat` / `deepseek-reasoner` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| 中转/代理 | 代理提供商的地址 | 该代理文档里的模型名 |
+
+> `deepseek-v4-flash` 这类名字属于代理服务商的命名，配 `api.deepseek.com` 会 404。
+
