@@ -4,7 +4,7 @@ import { useState } from "react"
 import type { Npc } from "@/lib/types"
 
 /**
- * NPC 头像：优先使用 public/avatars/<id>.png（把 AI 生成或图库照片放进去即可自动生效），
+ * NPC 头像：优先使用 public/avatars/<id>.svg（换成 .png 只需改这一处），
  * 没有图片时回退到 emoji 徽章，保证任何环境都不会出现破图。
  */
 export default function NpcAvatar({
@@ -32,7 +32,7 @@ export default function NpcAvatar({
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`/avatars/${npc.id}.png`}
+          src={`/avatars/${npc.id}.svg`}
           alt={npc.name}
           width={size}
           height={size}

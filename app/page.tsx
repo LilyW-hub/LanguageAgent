@@ -55,6 +55,7 @@ export default function Home() {
   const [replay, setReplay] = useState(false)
   const [stage, setStage] = useState(0)
   const [view, setView] = useState<"map" | "city">("map")
+  const [toast, setToast] = useState<string | null>(null)
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -221,6 +222,10 @@ export default function Home() {
               setProfile(payload.profile)
               setTrace((prev) => [...prev, ...payload.trace])
               if (payload.correction) setTab("trace")
+              if (payload.archiveCard) {
+                setToast(`📜 收录档案：${payload.archiveCard.title}`)
+                window.setTimeout(() => setToast(null), 2800)
+              }
             } else if (parsed.event === "error") {
               const message = (parsed.data as { error?: string }).error ?? "未知错误"
               throw new Error(message)
@@ -330,6 +335,12 @@ export default function Home() {
         archivesCount={archives.length}
         onBack={() => setView("map")}
       />
+
+      {toast && (
+        <div className="pointer-events-none fixed left-1/2 bottom-24 z-50 -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-sm font-medium text-amber-900 shadow-lg">
+          {toast}
+        </div>
+      )}
 
       <ChatView
         npc={npc}

@@ -109,6 +109,15 @@ export interface Npc {
   story: string
   /** 该角色场景下的快捷句式（属于人设，不同 NPC 不同） */
   suggestions: Array<{ label: string; text: string }>
+  /** 与该场景绑定的今日任务 */
+  quest: {
+    title: string
+    brief: string
+    goals: string[]
+    reward: string
+    /** 需要几次有效纠错才算完成 */
+    target: number
+  }
   avatarEmoji: string
   /** 场景背景图（public/scenes 下的 SVG） */
   sceneImage: string

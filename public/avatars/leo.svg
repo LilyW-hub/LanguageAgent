@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="leoBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D8E6F4"/>
+      <stop offset="100%" stop-color="#9DB8D6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="240" height="240" fill="url(#leoBg)"/>
+  <circle cx="120" cy="108" r="88" fill="#FFFFFF" opacity="0.22"/>
+
+  <!-- 肩膀 / 夹克 -->
+  <path d="M22 240 C22 192 66 166 120 166 C174 166 218 192 218 240 Z" fill="#3F546E"/>
+  <!-- 内搭 -->
+  <path d="M100 168 L120 202 L140 168 L128 163 L120 182 L112 163 Z" fill="#E8EDF3"/>
+  <!-- 相机背带 -->
+  <path d="M84 176 L120 236" stroke="#C2762B" stroke-width="7" fill="none" opacity="0.9"/>
+  <path d="M156 176 L120 236" stroke="#C2762B" stroke-width="7" fill="none" opacity="0.9"/>
+
+  <!-- 脖子 -->
+  <path d="M102 140 h36 v30 a18 18 0 0 1 -36 0 z" fill="#D29A6E"/>
+
+  <!-- 头发（后层） -->
+  <path d="M66 100 C66 56 92 34 120 34 C148 34 174 56 174 100 L174 118 C174 126 168 130 162 128 L78 128 C72 130 66 126 66 118 Z" fill="#2E2A27"/>
+
+  <!-- 脸 -->
+  <ellipse cx="120" cy="102" rx="46" ry="52" fill="#E8B183"/>
+
+  <!-- 短发 -->
+  <path d="M76 92 C80 58 96 42 120 42 C144 42 160 58 164 92 C150 72 136 64 120 64 C104 64 90 72 76 92 Z" fill="#2E2A27"/>
+  <path d="M74 100 q6 -10 14 -6" stroke="#2E2A27" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+  <!-- 耳朵 -->
+  <ellipse cx="75" cy="106" rx="7" ry="11" fill="#DC9F73"/>
+  <ellipse cx="165" cy="106" rx="7" ry="11" fill="#DC9F73"/>
+
+  <!-- 眉毛 -->
+  <path d="M94 90 q10 -5 19 1" stroke="#3B3531" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+  <path d="M127 91 q9 -6 19 -1" stroke="#3B3531" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+
+  <!-- 眼睛 -->
+  <ellipse cx="104" cy="104" rx="4.4" ry="5" fill="#241E1A"/>
+  <ellipse cx="136" cy="104" rx="4.4" ry="5" fill="#241E1A"/>
+  <circle cx="105.6" cy="102.2" r="1.4" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="137.6" cy="102.2" r="1.4" fill="#FFFFFF" opacity="0.9"/>
+
+  <!-- 眼镜（可选细节）—
+       不加，保持简洁 -->
+
+  <!-- 鼻子 -->
+  <path d="M120 110 q5 7 -1 9" stroke="#C8875C" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+
+  <!-- 胡渣 -->
+  <path d="M98 124 q22 22 44 0 q-6 14 -22 14 q-16 0 -22 -14 z" fill="#3B3531" opacity="0.22"/>
+
+  <!-- 微笑 -->
+  <path d="M108 128 q12 9 24 0" stroke="#A9634B" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+
+  <!-- 高光 -->
+  <ellipse cx="99" cy="82" rx="23" ry="13" fill="#FFFFFF" opacity="0.14"/>
+</svg>

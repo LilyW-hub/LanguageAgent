@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import ArchiveCardView from "./ArchiveCardView"
 import NpcAvatar from "./NpcAvatar"
 import PersonaCard from "./PersonaCard"
+import QuestCard from "./QuestCard"
 import PronunciationCard from "./PronunciationCard"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
@@ -48,6 +49,8 @@ export default function ChatView({
     setShowPersona(false)
   }, [npc.id])
 
+  const questDone = messages.filter((message) => message.correction).length
+
   const lastMessage = messages[messages.length - 1]
   const showTyping =
     busy && !(lastMessage?.role === "npc" && lastMessage.content.length > 0)
@@ -91,6 +94,8 @@ export default function ChatView({
           </div>
         </div>
       </header>
+
+      <QuestCard key={npc.id} npc={npc} done={questDone} />
 
       {showPersona && (
         <div className="relative">
