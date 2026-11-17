@@ -45,7 +45,7 @@ export interface ArchiveCard {
   summary: string
 }
 
-export type TraceAgent = "memory" | "tutor" | "npc" | "profile"
+export type TraceAgent = "memory" | "plan" | "tutor" | "npc" | "tool" | "profile"
 
 export interface TraceStep {
   turn: number
@@ -80,8 +80,27 @@ export interface ChatMessage {
   pronunciation?: PronunciationFeedback | null
 }
 
+/** 任务计划的当前进度 */
+export interface QuestPlan {
+  stepId: string
+  stepLabel: string
+  index: number
+  total: number
+}
+
+/** 间隔重复队列项 */
+export interface ReviewItem {
+  item: string
+  note: string
+  errorType: ErrorType
+  dueAt: string
+  npcId: string
+  turn: number
+}
+
 export interface ChatResponse {
   reply: string
+  plan: QuestPlan | null
   learningObjective: string
   correction: Correction | null
   profileDelta: ProfileDelta | null
@@ -114,6 +133,8 @@ export interface Npc {
     title: string
     brief: string
     goals: string[]
+    /** 任务状态机的步骤（顺序推进） */
+    steps: Array<{ id: string; label: string }>
     reward: string
     /** 需要几次有效纠错才算完成 */
     target: number

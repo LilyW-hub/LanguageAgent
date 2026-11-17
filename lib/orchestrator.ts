@@ -5,20 +5,28 @@ import { buildMemorySummary } from "./agents/memory"
 import { extractJson } from "./llm"
 import { fallbackReply, findScriptedTurn } from "./demoScript"
 import { getNpc } from "./npcs"
+import { executeTool, sanitizeToolCalls, type ToolCall, type ToolResult } from "./tools"
 import {
-  addArchive,
   addCorrection,
   addTrace,
+  advanceQuest,
   applyProfileDelta,
   getHistory,
   getProfile,
+  getQuestStep,
   getReplayMode,
   nextTurn,
   pushTurn,
 } from "./store"
-import type { ArchiveCard, ChatResponse, Correction, Profile, ProfileDelta, TraceStep } from "./types"
-
-const CITY_LABEL: Record<string, string> = { London: "伦敦" }
+import type {
+  ArchiveCard,
+  ChatResponse,
+  Correction,
+  Profile,
+  ProfileDelta,
+  QuestPlan,
+  TraceStep,
+} from "./types"
 
 export type ChatStage = "memory" | "tutor" | "npc"
 
@@ -36,37 +44,92 @@ const NO_CORRECTION = (text: string): Correction => ({
   addToReview: false,
 })
 
-/** 解析合并调用尾部的 META JSON；任何异常都降级为「无错误」，不弹课后卡 */
-function parseMeta(raw: string, userMessage: string): Correction {
+interface MetaBundle {
+  correction: Correction
+  focus: { word: string; note: string } | null
+  planStep: string | null
+  planReason: string | null
+  tools: ToolCall[]
+}
+
+/** 解析合并调用的 META：纠错 + 复习焦点 + 任务计划 + 工具申请 */
+function parseMeta(raw: string, userMessage: string): MetaBundle {
   if (process.env.DEBUG_META === "1") {
-    console.log("[meta raw]", JSON.stringify(raw.slice(0, 500)))
+    console.log("[meta raw]", JSON.stringify(raw.slice(0, 600)))
   }
 
   const parsed = extractJson(raw)
-  if (!parsed || typeof parsed !== "object") return NO_CORRECTION(userMessage)
-
-  const correction = toCorrection(parsed as Record<string, unknown>, userMessage)
-
-  // 只差标点/大小写 → 不算错误
-  if (sameExceptPunctuation(correction.corrected, userMessage)) return NO_CORRECTION(userMessage)
-
-  // 模型说没错误，但用词确实不同 → 以「有错误」为准
-  if (correction.errorType === "none") {
-    return { ...correction, errorType: "grammar", addToReview: true }
+  if (!parsed || typeof parsed !== "object") {
+    return { correction: NO_CORRECTION(userMessage), focus: null, planStep: null, planReason: null, tools: [] }
   }
 
-  return correction
+  const record = parsed as Record<string, unknown>
+  const correction = toCorrection(record, userMessage)
+
+  const rawFocus = record.focus
+  const focus =
+    typeof rawFocus === "object" && rawFocus !== null
+      ? (() => {
+          const word = (rawFocus as Record<string, unknown>).word
+          if (typeof word !== "string" || word.trim().length === 0) return null
+          const note = (rawFocus as Record<string, unknown>).note
+          return { word: word.trim(), note: typeof note === "string" ? note.trim() : "" }
+        })()
+      : null
+
+  const rawPlan = record.plan
+  let planStep: string | null = null
+  let planReason: string | null = null
+  if (typeof rawPlan === "object" && rawPlan !== null) {
+    const step = (rawPlan as Record<string, unknown>).step
+    if (typeof step === "string" && step.trim().length > 0) planStep = step.trim()
+    const reason = (rawPlan as Record<string, unknown>).reason
+    if (typeof reason === "string" && reason.trim().length > 0) planReason = reason.trim()
+  }
+
+  // 只差标点/大小写 → 不算错误
+  const finalCorrection = sameExceptPunctuation(correction.corrected, userMessage)
+    ? NO_CORRECTION(userMessage)
+    : correction.errorType === "none"
+      ? { ...correction, errorType: "grammar" as const, addToReview: true }
+      : correction
+
+  return {
+    correction: sameExceptPunctuation(correction.corrected, userMessage) ? NO_CORRECTION(userMessage) : finalCorrection,
+    focus,
+    planStep,
+    planReason,
+    tools: sanitizeToolCalls(record.tools),
+  }
+}
+
+/** 把模型给的计划步骤映射成本地任务进度；非法步骤不前进 */
+function resolvePlan(
+  npc: ReturnType<typeof getNpc>,
+  stepId: string | null,
+  reason: string | null,
+): { plan: QuestPlan; advanced: boolean } {
+  const steps = npc.quest.steps
+  const currentIndex = getQuestStep(npc.id)
+
+  let targetIndex = currentIndex
+  const found = stepId ? steps.findIndex((step) => step.id === stepId) : -1
+  // 每轮最多前进一步：避免模型一次性跳到收尾
+  if (found >= 0) targetIndex = Math.min(found, currentIndex + 1)
+
+  const advanced = targetIndex > currentIndex
+  const index = advanceQuest(npc.id, targetIndex)
+  const step = steps[Math.min(index, steps.length - 1)]!
+
+  return {
+    plan: { stepId: step.id, stepLabel: step.label, index, total: steps.length },
+    advanced: advanced || Boolean(reason),
+  }
 }
 
 /**
- * Orchestrator：memory → (profile 并行) → 合并调用流式产出回复 + 纠错 → 收尾。
- *
- * 相比早期版本的关键变化：tutor 与 npc **合并为一次模型往返**，
- * 延迟约减半，且纠错与回复同源（同一段输出里拆出来的）。
- *
- * 错误策略：
- * - Profile 提取失败：非致命，Trace 告警。
- * - NPC 生成失败：致命，抛出可执行提示的错误。
+ * Orchestrator：memory → (profile 并行) → 合并调用（回复 + 纠错 + 计划 + 工具申请）
+ *               → 执行工具 → 收尾。
  */
 export async function* handleChatStream(input: {
   message: string
@@ -79,31 +142,36 @@ export async function* handleChatStream(input: {
   const replay = getReplayMode()
   const turn = nextTurn()
 
-  // 1) Memory：读画像 + 冷启动摘要
   const memory = buildMemorySummary(profile, npc)
   yield { event: "stage", data: { stage: "memory" } }
 
-  // 2) 画像提取与回复并行（不阻塞首字）
   const extractorPromise = replay
     ? Promise.resolve({ delta: null as ProfileDelta | null, error: null as string | null })
     : runProfileExtractor({ userMessage: input.message, turn })
 
-  // 3) 回复 + 纠错
   yield { event: "stage", data: { stage: "tutor" } }
 
   let reply = ""
-  let correction: Correction
-  let npcStageSent = false
+  let meta: MetaBundle = {
+    correction: NO_CORRECTION(input.message),
+    focus: null,
+    planStep: null,
+    planReason: null,
+    tools: [],
+  }
 
   if (replay) {
     const scripted = findScriptedTurn(npc.id, input.message)
     reply = scripted?.reply ?? fallbackReply(npc.id)
-    correction = scripted?.correction ?? NO_CORRECTION(input.message)
+    meta.correction = scripted?.correction ?? NO_CORRECTION(input.message)
+    // 回放模式按轮次推进任务步骤
+    const steps = npc.quest.steps
+    meta.planStep = steps[Math.min(turn - 1, steps.length - 1)]!.id
     yield { event: "stage", data: { stage: "npc" } }
-    npcStageSent = true
     yield { event: "delta", data: { text: reply } }
   } else {
     let metaRaw = ""
+    let npcStageSent = false
 
     for await (const item of runMergedStream({
       npc,
@@ -125,14 +193,44 @@ export async function* handleChatStream(input: {
       }
     }
 
-    if (reply.trim().length === 0) {
-      throw new Error("模型返回了空内容")
-    }
-
-    correction = parseMeta(metaRaw, input.message)
+    if (reply.trim().length === 0) throw new Error("模型返回了空内容")
+    meta = parseMeta(metaRaw, input.message)
   }
 
-  // 4) 收集画像结果
+  const correction = meta.correction
+
+  // ── 任务计划 ──
+  const { plan, advanced } = resolvePlan(npc, meta.planStep, meta.planReason)
+
+  // ── 工具：模型申请 + 学习闭环兜底 ──
+  const calls: ToolCall[] = [...meta.tools]
+
+  if (correction.errorType !== "none") {
+    if (!calls.some((call) => call.name === "schedule_review")) {
+      calls.push({
+        name: "schedule_review",
+        args: {
+          item: meta.focus?.word ?? correction.corrected,
+          dueInDays: 1,
+          note: correction.explanation || meta.focus?.note || "",
+        },
+      })
+    }
+    if (!calls.some((call) => call.name === "create_archive")) {
+      calls.push({ name: "create_archive", args: {} })
+    }
+  }
+
+  const results: ToolResult[] = []
+  for (const call of calls) {
+    results.push(await executeTool(call, { npc, correction, turn }))
+  }
+
+  const archiveCard =
+    (results.find((item) => item.name === "create_archive" && item.ok)?.data as ArchiveCard | undefined) ??
+    null
+
+  // ── 画像 ──
   const extractorResult = await extractorPromise
   const profileDelta = replay
     ? (() => {
@@ -149,7 +247,7 @@ export async function* handleChatStream(input: {
 
   applyProfileDelta(profileDelta)
 
-  // 5) Trace
+  // ── Trace ──
   const inferredCount = profileDelta?.inferred?.length ?? 0
   const weaknessCount = profileDelta?.weaknesses?.length ?? 0
 
@@ -159,6 +257,12 @@ export async function* handleChatStream(input: {
       agent: "memory",
       action: `读取画像 → ${memory.focus.join(" / ")}`,
       detail: memory.summary,
+    },
+    {
+      turn,
+      agent: "plan",
+      action: `任务推进到 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}${advanced ? "（前进）" : ""}`,
+      detail: meta.planReason ?? undefined,
     },
     {
       turn,
@@ -177,6 +281,12 @@ export async function* handleChatStream(input: {
           ? `${npc.name} 生成回复`
           : `${npc.name} 用 corrected 生成回复（diegetic 纠错）`,
     },
+    ...results.map<TraceStep>((result) => ({
+      turn,
+      agent: "tool",
+      action: `🔧 ${result.name}(${JSON.stringify(result.args)})`,
+      detail: result.summary,
+    })),
     {
       turn,
       agent: "profile",
@@ -195,19 +305,7 @@ export async function* handleChatStream(input: {
     },
   ]
 
-  // 6) 档案卡：学习 → 档案
-  let archiveCard: ArchiveCard | null = null
-  if (correction.errorType !== "none") {
-    archiveCard = {
-      title: `${CITY_LABEL[npc.city] ?? npc.city}·${npc.sceneLabel}日常用语`,
-      city: npc.city,
-      category: "Life",
-      summary: `${npc.learningObjective} · ${correction.errorType}: ${correction.explanation || correction.corrected}`,
-    }
-    addArchive(archiveCard)
-  }
-
-  // 7) 落库
+  // ── 落库 ──
   pushTurn(npc.id, { role: "user", content: input.message })
   pushTurn(npc.id, { role: "npc", content: reply })
   if (correction.errorType !== "none") addCorrection(correction)
@@ -217,6 +315,7 @@ export async function* handleChatStream(input: {
     event: "done",
     data: {
       reply,
+      plan,
       learningObjective: npc.learningObjective,
       correction: correction.errorType === "none" ? null : correction,
       profileDelta,
@@ -227,7 +326,7 @@ export async function* handleChatStream(input: {
   }
 }
 
-/** 非流式封装：消费生成器，只取最终结果（供脚本与 curl 调试使用） */
+/** 非流式封装：消费生成器，只取最终结果 */
 export async function handleChat(input: { message: string; npcId: string }): Promise<ChatResponse> {
   let result: ChatResponse | undefined
   for await (const event of handleChatStream(input)) {

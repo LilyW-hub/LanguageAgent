@@ -22,9 +22,9 @@ export async function* runMergedStream(input: NpcPromptInput): AsyncGenerator<Me
 【输出格式（务必遵守，不得省略）】
 第一段：你的角色回复（纯文本，2 句以内，以简短提问结尾）。
 第二段：单独一行 ${META_DELIMITER}
-第三段：一个 JSON 对象，形如
-{"corrected":"修正后的英文句子","errorType":"grammar|vocabulary|word_order|pragmatics|none","explanation":"一句中文解释","natural":"更地道的英文","addToReview":true}
-即使没有任何错误，也必须输出 META 段，此时 errorType 填 "none"、corrected 与用户原句完全相同。`
+第三段：一个 JSON 对象，必须包含这八个字段：corrected / errorType / explanation / natural / addToReview / focus / plan / tools。
+即使没有任何错误，也必须输出 META 段（errorType 填 "none"，focus 填 null，tools 可为空数组）。
+`
 
   const stream = chatTextStream(mergedSystemFilled(input), userPrompt, {
     maxTokens: 700,

@@ -15,6 +15,7 @@ import type {
   Level,
   Profile,
   PronunciationFeedback,
+  QuestPlan,
   TraceStep,
 } from "@/lib/types"
 
@@ -56,6 +57,7 @@ export default function Home() {
   const [stage, setStage] = useState(0)
   const [view, setView] = useState<"map" | "city">("map")
   const [toast, setToast] = useState<string | null>(null)
+  const [plans, setPlans] = useState<Record<string, QuestPlan>>({})
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -128,6 +130,7 @@ export default function Home() {
       setProfile(payload.profile)
       setMessages({})
       setTrace([])
+      setPlans({})
       seedOpening(DEFAULT_NPC_ID)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -221,6 +224,9 @@ export default function Home() {
               })
               setProfile(payload.profile)
               setTrace((prev) => [...prev, ...payload.trace])
+              if (payload.plan) {
+                setPlans((prev) => ({ ...prev, [targetNpc]: payload.plan as QuestPlan }))
+              }
               if (payload.correction) setTab("trace")
               if (payload.archiveCard) {
                 setToast(`📜 收录档案：${payload.archiveCard.title}`)
@@ -276,6 +282,7 @@ export default function Home() {
     setProfile(null)
     setMessages({})
     setTrace([])
+    setPlans({})
     setNpcId(DEFAULT_NPC_ID)
     setError(null)
     setTab("profile")
@@ -348,6 +355,7 @@ export default function Home() {
         onSend={handleSend}
         busy={busy}
         stage={stage}
+        plan={plans[npcId] ?? null}
         error={error}
       />
 

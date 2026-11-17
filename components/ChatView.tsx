@@ -9,7 +9,7 @@ import PronunciationCard from "./PronunciationCard"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
 import { assessPronunciation } from "@/lib/pronunciation"
-import type { ChatMessage, Npc, PronunciationFeedback } from "@/lib/types"
+import type { ChatMessage, Npc, PronunciationFeedback, QuestPlan } from "@/lib/types"
 
 export default function ChatView({
   npc,
@@ -17,6 +17,7 @@ export default function ChatView({
   onSend,
   busy,
   stage,
+  plan,
   error,
 }: {
   npc: Npc
@@ -25,6 +26,8 @@ export default function ChatView({
   busy: boolean
   /** 真实管线阶段：0=读画像 1=分析表达 2=生成回复 */
   stage: number
+  /** 当前任务计划（服务端判定） */
+  plan: QuestPlan | null
   error: string | null
 }) {
   const [draft, setDraft] = useState("")
@@ -48,8 +51,6 @@ export default function ChatView({
   useEffect(() => {
     setShowPersona(false)
   }, [npc.id])
-
-  const questDone = messages.filter((message) => message.correction).length
 
   const lastMessage = messages[messages.length - 1]
   const showTyping =
@@ -95,7 +96,7 @@ export default function ChatView({
         </div>
       </header>
 
-      <QuestCard key={npc.id} npc={npc} done={questDone} />
+      <QuestCard key={npc.id} npc={npc} plan={plan} />
 
       {showPersona && (
         <div className="relative">

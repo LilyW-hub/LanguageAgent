@@ -144,21 +144,39 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
 【输出格式（必须严格遵守）】
 1) 先直接输出你的角色回复：纯文本，2 句话以内，必须以一个简短提问结尾。
 2) 然后另起一行，输出这一行：${META_DELIMITER}
-3) 再输出一个 JSON 对象（描述你刚才做过的纠错），字段完整、不要有注释、不要 markdown 围栏：
+3) 再输出一个 JSON 对象，字段完整、不要注释、不要 markdown 围栏：
+
 {
   "corrected": "把用户原句修正后的英文句子",
   "errorType": "grammar|vocabulary|word_order|pragmatics|none",
   "explanation": "一句中文解释",
   "natural": "更地道的英文说法（字符串）",
-  "addToReview": true
+  "addToReview": true,
+  "focus": { "word": "本轮值得复习的词或语法点", "note": "简短说明" },
+  "plan": { "step": "${npc.quest.steps.map((item) => item.id).join("|")}", "reason": "为什么停在这一步" },
+  "tools": [ { "name": "lookup_vocabulary", "args": { "word": "flat white" } } ]
 }
+
+【plan.step 的含义】
+本场景的任务分四步，按顺序推进：${npc.quest.steps.map((item, index) => `${index + 1}.${item.id}（${item.label}）`).join("　")}
+- 你必须判断这轮对话进行到哪一步，plan.step 只能取上面列出的 id。
+- 只前进不回退：用户已经点过单，就不要再回到 greet。
+- **每轮最多前进一步**：除非用户已经明确完成了当前步骤的动作，否则停在当前步骤。
+- reason 用一句中文说明判断依据。
+
+【tools 可用工具（只填你确实需要的，没有就给空数组 []）】
+- lookup_vocabulary { "word": "英文单词或短语" } —— 查词义与例句。用户问"这个词什么意思"时使用。
+- schedule_review { "item": "要复习的内容", "dueInDays": 1, "note": "为什么" } —— 把错误加入间隔重复队列。
+- create_archive { "title": "中文档案标题", "category": "Language|Culture|Life|People", "summary": "一句话摘要" } —— 收录一张文明档案。
+  title 必须用中文，格式为「城市·场景·主题」，例如「伦敦·咖啡馆·如何点单」或「伦敦·咖啡馆·过去时说法」。不要用英文标题。
+注意：如果用户这句有语言错误，你通常应该同时调用 schedule_review 与 create_archive。
 
 【纠错判定规则】
 检查用户原句时，逐项核对：① 时态 ② 主谓一致 ③ 冠词 ④ 介词 ⑤ 词序 ⑥ 用词搭配。
 只要任一项有问题，就必须把 errorType 填成对应类别（grammar / vocabulary / word_order / pragmatics），
 **不允许**把有问题的句子判成 "none"。
 - 只处理语法、词汇、语序、语用的错误；**不修改标点与大小写**。
-- 若用户原句没有这类错误：errorType 填 "none"，corrected 与用户原句完全一致。
+- 若用户原句没有这类错误：errorType 填 "none"，corrected 与用户原句完全一致，focus 填 null。
 - corrected 必须保留用户原本的标点与大小写。
 - 你在回复里对用户说法的自然复述，必须与 corrected 一致。`
 }

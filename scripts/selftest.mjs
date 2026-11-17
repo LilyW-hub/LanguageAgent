@@ -156,13 +156,42 @@ async function main() {
 
   const traceAgents = (errTurn.body.trace ?? []).map((item) => item.agent)
   record(
-    "Trace 四步齐全",
-    ["memory", "tutor", "npc", "profile"].every((agent) => traceAgents.includes(agent)),
+    "Trace 全链齐全",
+    ["memory", "plan", "tutor", "npc", "tool", "profile"].every((agent) =>
+      traceAgents.includes(agent),
+    ),
     traceAgents.join(" → "),
+  )
+
+  const tools = (errTurn.body.trace ?? []).filter((item) => item.agent === "tool")
+  record(
+    "工具被真实调用",
+    tools.length >= 2,
+    tools.map((item) => item.action.slice(0, 30)).join(" | "),
+  )
+  record(
+    "工具含复习排程与档案",
+    tools.some((item) => item.action.includes("schedule_review")) &&
+      tools.some((item) => item.action.includes("create_archive")),
+  )
+  record(
+    "任务计划有步骤",
+    Boolean(errTurn.body.plan?.stepLabel) && errTurn.body.plan.total === 4,
+    errTurn.body.plan ? `${errTurn.body.plan.stepLabel} ${errTurn.body.plan.index + 1}/4` : "无",
   )
 
   const cleanTurn = await chat("Can I have a flat white please?")
   record("正确句子：不误报", cleanTurn.body.correction === null, cleanTurn.body.correction?.corrected)
+  record(
+    "正确句子：不产生档案",
+    cleanTurn.body.archiveCard === null,
+    cleanTurn.body.archiveCard?.title,
+  )
+  record(
+    "任务步骤单步推进",
+    (cleanTurn.body.plan?.index ?? 0) <= (errTurn.body.plan?.index ?? 0) + 1,
+    `${errTurn.body.plan?.index} → ${cleanTurn.body.plan?.index}`,
+  )
 
   const punctTurn = await chat("i like coffee")
   record("纯标点/大小写：不误报", punctTurn.body.correction === null)

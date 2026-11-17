@@ -1,4 +1,4 @@
-import type { ArchiveCard, Correction, Profile, ProfileDelta, TraceStep } from "./types"
+import type { ArchiveCard, Correction, Profile, ProfileDelta, ReviewItem, TraceStep } from "./types"
 
 /** 单条对话轮次（短期上下文） */
 export interface ChatTurn {
@@ -13,6 +13,9 @@ interface StoreState {
   archives: ArchiveCard[]
   trace: TraceStep[]
   turn: number
+  reviews: ReviewItem[]
+  /** 每个 NPC 的任务推进到第几步 */
+  questStep: Record<string, number>
   /** 回放模式：不调用模型，走 lib/demoScript.ts 的剧本（现场兜底） */
   replay: boolean
 }
@@ -25,6 +28,8 @@ function createStore(): StoreState {
     archives: [],
     trace: [],
     turn: 0,
+    reviews: [],
+    questStep: {},
     replay: false,
   }
 }
@@ -58,6 +63,8 @@ export function resetStore(): void {
   store.archives = []
   store.trace = []
   store.turn = 0
+  store.reviews = []
+  store.questStep = {}
 }
 
 export function currentTurn(): number {
@@ -89,6 +96,34 @@ export function addArchive(card: ArchiveCard): void {
 
 export function getArchives(): ArchiveCard[] {
   return store.archives
+}
+
+export function countArchives(): number {
+  return store.archives.length
+}
+
+export function addReview(item: ReviewItem): void {
+  store.reviews.push(item)
+}
+
+export function getReviews(): ReviewItem[] {
+  return store.reviews
+}
+
+export function countReviews(): number {
+  return store.reviews.length
+}
+
+/** 任务进度只前进不后退 */
+export function advanceQuest(npcId: string, stepIndex: number): number {
+  const current = store.questStep[npcId] ?? 0
+  const next = Math.max(current, stepIndex)
+  store.questStep[npcId] = next
+  return next
+}
+
+export function getQuestStep(npcId: string): number {
+  return store.questStep[npcId] ?? 0
 }
 
 export function addTrace(steps: TraceStep[]): void {
