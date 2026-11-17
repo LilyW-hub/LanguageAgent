@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import ArchivePanel, { type ArchiveEntry } from "@/components/ArchivePanel"
 import ChatView from "@/components/ChatView"
 import CitySelect from "@/components/CitySelect"
 import Onboarding from "@/components/Onboarding"
@@ -46,7 +47,7 @@ export default function Home() {
   const [npcId, setNpcId] = useState(DEFAULT_NPC_ID)
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({})
   const [trace, setTrace] = useState<TraceStep[]>([])
-  const [tab, setTab] = useState<"profile" | "trace">("profile")
+  const [tab, setTab] = useState<"profile" | "trace" | "archive">("profile")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
@@ -297,9 +298,14 @@ export default function Home() {
   }
 
   const npc = getNpc(npcId)
-  const archives = Object.values(messages)
-    .flat()
-    .filter((message) => message.archiveCard)
+
+  const archiveEntries: ArchiveEntry[] = Object.entries(messages).flatMap(([id, list]) =>
+    list
+      .filter((message) => message.archiveCard)
+      .map((message) => ({ card: message.archiveCard!, npcName: getNpc(id).name })),
+  )
+
+  const archives = archiveEntries
 
   return (
     <>
@@ -336,6 +342,17 @@ export default function Home() {
           </button>
           <button
             type="button"
+            onClick={() => setTab("archive")}
+            className={`px-3 py-2 text-xs rounded-t-lg ${
+              tab === "archive"
+                ? "bg-stone-100 text-stone-900 font-medium"
+                : "text-stone-500 hover:text-stone-800"
+            }`}
+          >
+            档案{archiveEntries.length > 0 ? ` ${archiveEntries.length}` : ""}
+          </button>
+          <button
+            type="button"
             onClick={() => setTab("trace")}
             className={`px-3 py-2 text-xs rounded-t-lg ${
               tab === "trace"
@@ -369,7 +386,13 @@ export default function Home() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {tab === "profile" ? <ProfilePanel profile={profile} /> : <TracePanel trace={trace} />}
+          {tab === "profile" ? (
+            <ProfilePanel profile={profile} />
+          ) : tab === "archive" ? (
+            <ArchivePanel entries={archiveEntries} />
+          ) : (
+            <TracePanel trace={trace} />
+          )}
         </div>
 
         <div className="px-4 py-2 border-t border-stone-200 text-[10px] text-stone-400">

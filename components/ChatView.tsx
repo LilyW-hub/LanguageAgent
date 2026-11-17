@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import ArchiveCardView from "./ArchiveCardView"
 import NpcAvatar from "./NpcAvatar"
+import PersonaCard from "./PersonaCard"
 import PronunciationCard from "./PronunciationCard"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
@@ -28,6 +29,7 @@ export default function ChatView({
   const [draft, setDraft] = useState("")
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceMeta, setVoiceMeta] = useState<PronunciationFeedback | null>(null)
+  const [showPersona, setShowPersona] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -41,6 +43,10 @@ export default function ChatView({
     setDraft("")
     setVoiceMeta(null)
   }
+
+  useEffect(() => {
+    setShowPersona(false)
+  }, [npc.id])
 
   const lastMessage = messages[messages.length - 1]
   const showTyping =
@@ -58,17 +64,25 @@ export default function ChatView({
       <header className="relative px-5 py-3 border-b border-stone-200 bg-white/80 backdrop-blur">
         <div className="flex items-center gap-3">
           <NpcAvatar npc={npc} size={38} />
-          <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => setShowPersona((prev) => !prev)}
+            className="min-w-0 flex-1 text-left group"
+            title="查看人物介绍"
+          >
             <div className="flex items-center gap-2">
-              <span className="font-medium text-stone-900">{npc.name}</span>
+              <span className="font-medium text-stone-900 group-hover:underline">{npc.name}</span>
               <span className="text-xs text-stone-400">
                 {npc.profession} · {npc.age}
+              </span>
+              <span className="text-[10px] text-stone-400">
+                {showPersona ? "▴" : "ⓘ 人物"}
               </span>
             </div>
             <div className="text-xs text-stone-500 truncate">
               📍 {npc.city} · {npc.sceneLabel}
             </div>
-          </div>
+          </button>
           <div
             className="text-[11px] px-2 py-1 rounded-full border bg-white/70"
             style={{ borderColor: npc.accent, color: npc.accent }}
@@ -77,6 +91,12 @@ export default function ChatView({
           </div>
         </div>
       </header>
+
+      {showPersona && (
+        <div className="relative">
+          <PersonaCard npc={npc} onClose={() => setShowPersona(false)} />
+        </div>
+      )}
 
       <div className="relative flex-1 overflow-y-auto px-5 py-4 space-y-3">
         {messages.map((message) => (
