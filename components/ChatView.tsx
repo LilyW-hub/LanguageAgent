@@ -27,11 +27,27 @@ export default function ChatView({
 }) {
   const [draft, setDraft] = useState("")
   const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [stage, setStage] = useState(0)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages.length, busy])
+  }, [messages.length, busy, stage])
+
+  // 管线是 tutor → npc 的固定顺序，用阶段文案把等待过程讲清楚
+  useEffect(() => {
+    if (!busy) {
+      setStage(0)
+      return
+    }
+    setStage(0)
+    const toTutor = setTimeout(() => setStage(1), 900)
+    const toNpc = setTimeout(() => setStage(2), 3200)
+    return () => {
+      clearTimeout(toTutor)
+      clearTimeout(toNpc)
+    }
+  }, [busy])
 
   function submit() {
     const text = draft.trim()
@@ -106,8 +122,19 @@ export default function ChatView({
 
         {busy && (
           <div className="flex justify-start">
-            <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-stone-400">
-              {npc.name} 正在输入…
+            <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-stone-400 flex items-center gap-2">
+              <span className="inline-flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.2s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.1s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce" />
+              </span>
+              <span>
+                {stage === 0
+                  ? "🧠 读取画像…"
+                  : stage === 1
+                    ? "🩺 分析你的表达…"
+                    : `🎭 ${npc.name} 正在回复…`}
+              </span>
             </div>
           </div>
         )}

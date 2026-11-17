@@ -73,7 +73,11 @@ export function llm(): OpenAI {
 }
 
 /** 纯文本补全；失败时抛出带可执行提示的错误（不再静默降级） */
-export async function chatText(system: string, user: string): Promise<string> {
+export async function chatText(
+  system: string,
+  user: string,
+  options: { maxTokens?: number; temperature?: number } = {},
+): Promise<string> {
   try {
     const res = await llm().chat.completions.create({
       model: MODEL,
@@ -81,11 +85,27 @@ export async function chatText(system: string, user: string): Promise<string> {
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      temperature: 0.8,
+      temperature: options.temperature ?? 0.8,
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     })
     const text = (res.choices[0]?.message?.content ?? "").trim()
-    if (text.length === 0) throw new Error("模型返回了空内容")
-    return text
+    if (text.length > 0) return text
+
+    // 空内容常见于 max_tokens 被推理/截断吃满：去掉上限重试一次
+    if (options.maxTokens) {
+      const retry = await llm().chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        temperature: options.temperature ?? 0.8,
+      })
+      const retryText = (retry.choices[0]?.message?.content ?? "").trim()
+      if (retryText.length > 0) return retryText
+    }
+
+    throw new Error("模型返回了空内容")
   } catch (error) {
     throw new Error(describeLlmError(error))
   }
@@ -100,7 +120,11 @@ export interface JsonResult<T> {
  * 结构化 JSON 补全：优先 response_format，失败降级为提示词约束 + 兜底解析。
  * 返回 error 让调用方决定如何呈现（不静默吞掉失败原因）。
  */
-export async function chatJson<T>(system: string, user: string): Promise<JsonResult<T>> {
+export async function chatJson<T>(
+  system: string,
+  user: string,
+  options: { maxTokens?: number } = {},
+): Promise<JsonResult<T>> {
   const messages = [
     { role: "system" as const, content: system },
     { role: "user" as const, content: user },
@@ -115,6 +139,7 @@ export async function chatJson<T>(system: string, user: string): Promise<JsonRes
       messages,
       temperature: 0,
       response_format: { type: "json_object" },
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     })
     const parsed = extractJson(res.choices[0]?.message?.content ?? "")
     if (parsed) return { data: parsed as T, error: null }
@@ -133,6 +158,7 @@ export async function chatJson<T>(system: string, user: string): Promise<JsonRes
       model: MODEL,
       messages,
       temperature: 0,
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     })
     const parsed = extractJson(res.choices[0]?.message?.content ?? "")
     if (parsed) return { data: parsed as T, error: null }

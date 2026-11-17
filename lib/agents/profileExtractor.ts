@@ -36,6 +36,7 @@ export async function runProfileExtractor(input: {
   const result = await chatJson<Record<string, unknown>>(
     extractorSystemPrompt(),
     `输入："${input.userMessage}"`,
+    { maxTokens: 260 },
   )
 
   if (!result.data) {

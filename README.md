@@ -148,3 +148,21 @@ ASR_LANGUAGE=en
 
 > `deepseek-v4-flash` 这类名字属于代理服务商的命名，配 `api.deepseek.com` 会 404。
 
+
+---
+
+## 模型选择与延迟（实测）
+
+同一把 Key、同一代理端点下实测（单轮含 tutor + profile + npc 三次调用）：
+
+| 模型 | 单轮总耗时 | 说明 |
+|---|---|---|
+| `chatgpt-4o-latest` | **3.6–6.8s** | 当前选用，JSON 稳定、角色扮演自然 |
+| `deepseek-v4-1-flash-261017` | 5.3–7.0s | 可用，JSON 稳定 |
+| `deepseek-v4.1-flash` | 6–9s | `errorType` 会返回自由文本（已做归一化） |
+| `deepseek-v4-pro` | 9s+ | JSON 模式偶发空内容，不推荐 |
+
+延迟主要来自两次串行调用：`tutor`（必须先出 corrected，才能保证 NPC 的两层纠错同源）+ `npc`。
+界面上用分阶段提示（🧠 读取画像 → 🩺 分析表达 → 🎭 正在回复）把等待讲清楚。
+
+**若还要更快**，可做流式输出（NPC 逐字返回），首字感知延迟可降到 ~3s；或把 tutor 换更小的模型。

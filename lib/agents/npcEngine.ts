@@ -9,5 +9,5 @@ import { npcSystemFilled, npcUserPrompt, type NpcPromptInput } from "../prompts"
  * 由 API 层转成给用户看的信息——假回复会掩盖配置问题，比报错更糟。
  */
 export async function runNpcEngine(input: NpcPromptInput): Promise<string> {
-  return await chatText(npcSystemFilled(input), npcUserPrompt(input))
+  return await chatText(npcSystemFilled(input), npcUserPrompt(input), { maxTokens: 400 })
 }

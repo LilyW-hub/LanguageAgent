@@ -3,7 +3,7 @@ import type { Correction, Npc, Profile } from "./types"
 
 /** 对话历史格式化为提示词片段（只保留最近 8 条，控制上下文成本） */
 export function formatHistory(history: ChatTurn[], npcName: string): string {
-  const recent = history.slice(-8)
+  const recent = history.slice(-6)
   if (recent.length === 0) return "（这是你们的第一次对话）"
   return recent
     .map((turn) => (turn.role === "user" ? `旅行者：${turn.content}` : `${npcName}：${turn.content}`))
@@ -30,6 +30,7 @@ export function npcSystemPrompt(npc: Npc): string {
    - 对方可能感兴趣：{INTERESTS}
    - 对方正在练习的薄弱点：{WEAKNESSES}
 5. 用适合该水平的词汇和句长。对方是学习者，句子别太长、别用生僻词。
+6. **回复控制在 2 句话、40 词以内**，并以一个简短提问结尾，把对话交还给对方。
 
 【纠错规则（diegetic，不打断）】
 - 如果本句有错误，会给你 Tutor 给出的正确说法：{CORRECTED}。
@@ -90,7 +91,7 @@ export function tutorSystemPrompt(level: string): string {
   "corrected": "改后句子",
   "errorType": "grammar|vocabulary|word_order|pragmatics|none",
   "explanation": "一句话中文解释，如：过去时要用 went 而不是 go",
-  "natural": "更地道的同义说法（英文）",
+  "natural": "更地道的同义说法（英文句子字符串，不要用 true/false）",
   "addToReview": true
 }`
 }

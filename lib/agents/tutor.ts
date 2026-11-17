@@ -14,10 +14,23 @@ function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback
 }
 
+function normalizeErrorType(value: unknown): ErrorType {
+  if (typeof value === "string") {
+    const raw = value.trim().toLowerCase()
+    if (ERROR_TYPES.includes(raw as ErrorType)) return raw as ErrorType
+    // 模型常返回自由描述（"Verb tense" / "past tense" / "preposition"…），做一次归类
+    if (/tense|verb|agreement|article|preposition|plural|grammar/.test(raw)) return "grammar"
+    if (/vocab|word choice|lexical|collocation/.test(raw)) return "vocabulary"
+    if (/word order|order|syntax/.test(raw)) return "word_order"
+    if (/pragmat|politeness|register|natural/.test(raw)) return "pragmatics"
+    if (/none|no error/.test(raw)) return "none"
+    return "none"
+  }
+  return "none"
+}
+
 function normalize(raw: Record<string, unknown>, userMessage: string): Correction {
-  const errorType = ERROR_TYPES.includes(raw.errorType as ErrorType)
-    ? (raw.errorType as ErrorType)
-    : "none"
+  const errorType = normalizeErrorType(raw.errorType)
 
   const corrected = asString(raw.corrected, userMessage)
 
@@ -48,6 +61,7 @@ export async function runTutor(input: { userMessage: string; level: string }): P
   const result = await chatJson<Record<string, unknown>>(
     tutorSystemPrompt(input.level),
     `输入："${input.userMessage}"`,
+    { maxTokens: 260 },
   )
 
   if (!result.data) {
