@@ -10,6 +10,26 @@ export interface TutorResult {
   error: string | null
 }
 
+/** 需要忽略的标点与符号（中英文，含全角） */
+const PUNCTUATION = /[.,!?;:'"`()\[\]{}<>«»„“”‘’—–\-_/\\|@#$%^&*+=~…·、。，！？；：（）【】《》「」『』〈〉]/g
+
+/**
+ * 归一化：去掉标点、符号与多余空白，并统一小写。
+ * 用于判断两句话「是否只差标点/大小写」——那种差异不算语言错误。
+ */
+export function coreText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(PUNCTUATION, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** 仅标点/大小写/空白不同的两句话视为同一句 */
+export function sameExceptPunctuation(a: string, b: string): boolean {
+  return coreText(a) === coreText(b)
+}
+
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback
 }
@@ -70,12 +90,23 @@ export async function runTutor(input: { userMessage: string; level: string }): P
 
   const correction = normalize(result.data, input.userMessage)
 
-  // 模型说没错误，但 corrected 与原文不同 → 以「有错误」为准，避免漏纠
-  if (
-    correction.errorType === "none" &&
-    correction.corrected.trim() !== input.userMessage.trim() &&
-    correction.corrected.trim().length > 0
-  ) {
+  // 只看标点/大小写就相同的句子：不算错误，回退成原句（不弹课后卡）
+  if (sameExceptPunctuation(correction.corrected, input.userMessage)) {
+    return {
+      correction: {
+        original: input.userMessage,
+        corrected: input.userMessage,
+        errorType: "none",
+        explanation: "",
+        natural: input.userMessage,
+        addToReview: false,
+      },
+      error: null,
+    }
+  }
+
+  // 模型说没错误，但 corrected 的**用词**确实不同 → 以「有错误」为准，避免漏纠
+  if (correction.errorType === "none" && correction.corrected.trim().length > 0) {
     correction.errorType = "grammar"
     correction.addToReview = true
   }

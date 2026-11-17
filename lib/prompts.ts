@@ -85,6 +85,12 @@ export function tutorSystemPrompt(level: string): string {
   return `你是英语纠错专家。分析用户这句话（说话者母语中文，目标语言英语，水平 ${level}）。
 只处理**明显且值得教**的语言错误；没有错误就输出 errorType:"none"，corrected 与 original 相同。
 
+【标点与大小写规则（重要）】
+- **不要修改标点符号**：句号、逗号、问号、感叹号、引号、省略号等一律保持用户原样。
+- **不要修正大小写**（句首大写、专有名词大小写都算用户的表达习惯，不要动）。
+- 如果这句话的唯一问题只是标点缺失/多余或大小写，一律判定 errorType:"none"，corrected 必须与 original 完全一致。
+- corrected 只反映语法、词汇、语序、语用的修正；标点与大小写要从 original 原样保留。
+
 严格输出 JSON（不要多余文字、不要 markdown 围栏）：
 {
   "original": "原文",
