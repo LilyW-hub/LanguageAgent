@@ -120,3 +120,45 @@ export function extractorSystemPrompt(): string {
 - fact 用英文短语描述。
 - weaknesses 填本条消息里能看出的语言薄弱点，用英文短名，如 "past tense"、"articles"。`
 }
+
+
+/** 合并调用的分隔符：回复正文与结构化纠错之间的边界 */
+export const META_DELIMITER = "===META==="
+
+/**
+ * 合并版 NPC 提示词：一次调用同时产出「角色回复」和「结构化纠错」。
+ *
+ * 为什么要合并：tutor 与 npc 串行意味着两次模型往返（各约 4s）。
+ * 合并后只需一次往返，且两层纠错天然同源（同一段输出）。
+ */
+export function mergedSystemFilled(input: NpcPromptInput): string {
+  const { npc, profile } = input
+  const interests = [...profile.explicit.interests, ...profile.inferred.map((item) => item.fact)]
+
+  return `${npcSystemPrompt(npc)
+    .replace("{LEVEL}", profile.level)
+    .replace("{INTERESTS}", formatList(interests))
+    .replace("{WEAKNESSES}", formatList(profile.learning.weaknesses))
+    .replace("{CORRECTED}", "（由你自己判断并在 META 里给出）")}
+
+【输出格式（必须严格遵守）】
+1) 先直接输出你的角色回复：纯文本，2 句话以内，必须以一个简短提问结尾。
+2) 然后另起一行，输出这一行：${META_DELIMITER}
+3) 再输出一个 JSON 对象（描述你刚才做过的纠错），字段完整、不要有注释、不要 markdown 围栏：
+{
+  "corrected": "把用户原句修正后的英文句子",
+  "errorType": "grammar|vocabulary|word_order|pragmatics|none",
+  "explanation": "一句中文解释",
+  "natural": "更地道的英文说法（字符串）",
+  "addToReview": true
+}
+
+【纠错判定规则】
+检查用户原句时，逐项核对：① 时态 ② 主谓一致 ③ 冠词 ④ 介词 ⑤ 词序 ⑥ 用词搭配。
+只要任一项有问题，就必须把 errorType 填成对应类别（grammar / vocabulary / word_order / pragmatics），
+**不允许**把有问题的句子判成 "none"。
+- 只处理语法、词汇、语序、语用的错误；**不修改标点与大小写**。
+- 若用户原句没有这类错误：errorType 填 "none"，corrected 与用户原句完全一致。
+- corrected 必须保留用户原本的标点与大小写。
+- 你在回复里对用户说法的自然复述，必须与 corrected 一致。`
+}

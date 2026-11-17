@@ -16,6 +16,24 @@ import type {
   TraceStep,
 } from "@/lib/types"
 
+/** 解析一个 SSE 事件块（"event: x\ndata: {...}"） */
+function parseSseBlock(block: string): { event: string; data: unknown } | null {
+  let event = "message"
+  let data = ""
+
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim()
+    else if (line.startsWith("data:")) data += line.slice(5).trim()
+  }
+
+  if (!data) return null
+  try {
+    return { event, data: JSON.parse(data) as unknown }
+  } catch {
+    return null
+  }
+}
+
 let messageSeq = 0
 function nextId(prefix: string): string {
   messageSeq += 1
@@ -33,6 +51,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
   const [replay, setReplay] = useState(false)
+  const [stage, setStage] = useState(0)
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -122,8 +141,11 @@ export default function Home() {
     if (!profile || busy) return
     setBusy(true)
     setError(null)
+    setStage(0)
 
     const targetNpc = npcId
+    const assistantId = nextId("npc")
+
     setMessages((prev) => ({
       ...prev,
       [targetNpc]: [
@@ -134,41 +156,87 @@ export default function Home() {
           content: text,
           pronunciation: pronunciation ?? null,
         },
+        // 先放一个空的 NPC 气泡，流式增量往里填
+        { id: assistantId, role: "npc", content: "" },
       ],
     }))
+
+    const patchAssistant = (patch: Partial<ChatMessage>) => {
+      setMessages((prev) => ({
+        ...prev,
+        [targetNpc]: (prev[targetNpc] ?? []).map((item) =>
+          item.id === assistantId ? { ...item, ...patch } : item,
+        ),
+      }))
+    }
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ message: text, npcId: targetNpc }),
       })
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const payload = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(payload.error ? `请求失败：${payload.error}` : `请求失败（${res.status}）`)
       }
 
-      const payload = (await res.json()) as ChatResponse
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      let reply = ""
+      let finished = false
 
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        let boundary = buffer.indexOf("\n\n")
+        while (boundary !== -1) {
+          const block = buffer.slice(0, boundary)
+          buffer = buffer.slice(boundary + 2)
+
+          const parsed = parseSseBlock(block)
+          if (parsed) {
+            if (parsed.event === "stage") {
+              const stageName = (parsed.data as { stage?: string }).stage
+              setStage(stageName === "tutor" ? 1 : stageName === "npc" ? 2 : 0)
+            } else if (parsed.event === "delta") {
+              const chunk = (parsed.data as { text?: string }).text ?? ""
+              reply += chunk
+              patchAssistant({ content: reply })
+            } else if (parsed.event === "done") {
+              const payload = parsed.data as ChatResponse
+              finished = true
+              patchAssistant({
+                content: payload.reply,
+                correction: payload.correction,
+                archiveCard: payload.archiveCard,
+              })
+              setProfile(payload.profile)
+              setTrace((prev) => [...prev, ...payload.trace])
+              if (payload.correction) setTab("trace")
+            } else if (parsed.event === "error") {
+              const message = (parsed.data as { error?: string }).error ?? "未知错误"
+              throw new Error(message)
+            }
+          }
+
+          boundary = buffer.indexOf("\n\n")
+        }
+      }
+
+      if (!finished) throw new Error("连接中断，没有得到完整回复")
+    } catch (cause) {
+      // 失败时移除空的 NPC 气泡，避免留下空白
       setMessages((prev) => ({
         ...prev,
-        [targetNpc]: [
-          ...(prev[targetNpc] ?? []),
-          {
-            id: nextId("npc"),
-            role: "npc",
-            content: payload.reply,
-            correction: payload.correction,
-            archiveCard: payload.archiveCard,
-          },
-        ],
+        [targetNpc]: (prev[targetNpc] ?? []).filter(
+          (item) => !(item.id === assistantId && item.content.length === 0),
+        ),
       }))
-
-      setProfile(payload.profile)
-      setTrace((prev) => [...prev, ...payload.trace])
-      if (payload.correction) setTab("trace")
-    } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setBusy(false)
@@ -249,6 +317,7 @@ export default function Home() {
         messages={messages[npcId] ?? []}
         onSend={handleSend}
         busy={busy}
+        stage={stage}
         error={error}
       />
 

@@ -14,38 +14,25 @@ export default function ChatView({
   messages,
   onSend,
   busy,
+  stage,
   error,
 }: {
   npc: Npc
   messages: ChatMessage[]
   onSend: (text: string, pronunciation?: PronunciationFeedback | null) => void
   busy: boolean
+  /** 真实管线阶段：0=读画像 1=分析表达 2=生成回复 */
+  stage: number
   error: string | null
 }) {
   const [draft, setDraft] = useState("")
   const [voiceError, setVoiceError] = useState<string | null>(null)
-  const [stage, setStage] = useState(0)
   const [voiceMeta, setVoiceMeta] = useState<PronunciationFeedback | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length, busy, stage])
-
-  // 管线是 tutor → npc 的固定顺序，用阶段文案把等待过程讲清楚
-  useEffect(() => {
-    if (!busy) {
-      setStage(0)
-      return
-    }
-    setStage(0)
-    const toTutor = setTimeout(() => setStage(1), 900)
-    const toNpc = setTimeout(() => setStage(2), 3200)
-    return () => {
-      clearTimeout(toTutor)
-      clearTimeout(toNpc)
-    }
-  }, [busy])
 
   function submit() {
     const text = draft.trim()
@@ -54,6 +41,10 @@ export default function ChatView({
     setDraft("")
     setVoiceMeta(null)
   }
+
+  const lastMessage = messages[messages.length - 1]
+  const showTyping =
+    busy && !(lastMessage?.role === "npc" && lastMessage.content.length > 0)
 
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
@@ -123,7 +114,7 @@ export default function ChatView({
           </div>
         ))}
 
-        {busy && (
+        {showTyping && (
           <div className="flex justify-start">
             <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-stone-400 flex items-center gap-2">
               <span className="inline-flex gap-1">
@@ -135,7 +126,7 @@ export default function ChatView({
                 {stage === 0
                   ? "🧠 读取画像…"
                   : stage === 1
-                    ? "🩺 分析你的表达…"
+                    ? "🩺 理解你的表达…"
                     : `🎭 ${npc.name} 正在回复…`}
               </span>
             </div>

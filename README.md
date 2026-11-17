@@ -40,14 +40,18 @@ npm run dev     # http://localhost:3000
 
 ```
 用户消息 → Orchestrator（确定性管线）
-              ├─ 1. Memory      读画像 → 冷启动摘要
-              ├─ 2. Tutor       纠错（唯一事实源）+ Profile Extractor（并行）
-              ├─ 3. NPC Engine  引用 corrected 生成回复（diegetic 纠错）
-              └─ 4. Profile     合并画像增量
-           → { reply, correction, profileDelta, archiveCard, trace, profile }
+              ├─ 1. Memory      读画像 → 冷启动摘要          （零成本，纯计算）
+              ├─ 2. Profile     画像提取    ┐ 与回复并行，不阻塞首字
+              ├─ 3. NPC Engine  回复 + 纠错  ┘ 一次调用产出两样东西（流式）
+              └─ 4. 收尾        组装档案卡 / Trace / 落库
+           → SSE: stage → delta… → done { reply, correction, profileDelta, archiveCard, trace }
 ```
 
-四者是**同一应用内的专职模块**，不是四套独立服务（与 PRD「单主控 + 模块」一致）。
+**关键设计：纠错与回复合并为一次模型往返。**
+输出协议是 `<回复正文> ===META=== <纠错 JSON>`：正文边生成边推给前端，META 段服务端解析成课后卡。
+这样延迟从「两次往返 ≈ 9–14s」降到「一次往返 ≈ 2–4s」，而且两层纠错出自同一段输出，天然同源。
+
+各模块是**同一应用内的专职单元**，不是独立服务（与 PRD「单主控 + 模块」一致）。
 Agent 感由右侧 **Trace 面板**实时呈现。
 
 | 文件 | 作用 |
@@ -199,14 +203,16 @@ ASR_LANGUAGE=en
 
 同一把 Key、同一代理端点下实测（单轮含 tutor + profile + npc 三次调用）：
 
-| 模型 | 单轮总耗时 | 说明 |
-|---|---|---|
-| `chatgpt-4o-latest` | **3.6–6.8s** | 当前选用，JSON 稳定、角色扮演自然 |
-| `deepseek-v4-1-flash-261017` | 5.3–7.0s | 可用，JSON 稳定 |
-| `deepseek-v4.1-flash` | 6–9s | `errorType` 会返回自由文本（已做归一化） |
-| `deepseek-v4-pro` | 9s+ | JSON 模式偶发空内容，不推荐 |
+| 指标 | 数值（合并调用 + 流式） |
+|---|---|
+| 首个文字出现 | **1.8–4.3s** |
+| 完整回复结束 | **3–4.7s** |
 
-延迟主要来自两次串行调用：`tutor`（必须先出 corrected，才能保证 NPC 的两层纠错同源）+ `npc`。
-界面上用分阶段提示（🧠 读取画像 → 🩺 分析表达 → 🎭 正在回复）把等待讲清楚。
+对比：
+- 早期两次串行调用（tutor → npc）：首字 9–14s
+- 合并成一次调用后：首字 1.8–4.3s，体感提升约 3 倍
 
-**若还要更快**，可做流式输出（NPC 逐字返回），首字感知延迟可降到 ~3s；或把 tutor 换更小的模型。
+延迟几乎全部来自模型的 **time-to-first-token**（代理实测 ~4s），生成本身很快。
+所以「减少调用次数」比「优化生成速度」有效得多。
+
+界面阶段提示（🧠 读取画像 → 🩺 理解表达 → 🎭 正在回复）由服务端 `stage` 事件驱动，不是假进度。

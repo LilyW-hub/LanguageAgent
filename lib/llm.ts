@@ -146,6 +146,39 @@ export async function chatText(
   }
 }
 
+/** 流式文本补全：逐块产出增量，用于 NPC 回复边生成边显示 */
+export async function* chatTextStream(
+  system: string,
+  user: string,
+  options: { maxTokens?: number; temperature?: number } = {},
+): AsyncGenerator<string> {
+  let stream
+  try {
+    stream = await withRetry(() =>
+      llm().chat.completions.create(
+        {
+          model: MODEL,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: options.temperature ?? 0.8,
+          stream: true,
+          ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        },
+        { timeout: REQUEST_TIMEOUT_MS },
+      ),
+    )
+  } catch (error) {
+    throw new Error(describeLlmError(error))
+  }
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta?.content
+    if (delta && delta.length > 0) yield delta
+  }
+}
+
 export interface JsonResult<T> {
   data: T | null
   error: string | null

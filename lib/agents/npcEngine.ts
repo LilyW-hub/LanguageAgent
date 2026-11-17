@@ -1,4 +1,4 @@
-import { chatText } from "../llm"
+import { chatText, chatTextStream } from "../llm"
 import { npcSystemFilled, npcUserPrompt, type NpcPromptInput } from "../prompts"
 
 /**
@@ -10,4 +10,9 @@ import { npcSystemFilled, npcUserPrompt, type NpcPromptInput } from "../prompts"
  */
 export async function runNpcEngine(input: NpcPromptInput): Promise<string> {
   return await chatText(npcSystemFilled(input), npcUserPrompt(input), { maxTokens: 400 })
+}
+
+/** 流式版本：逐块产出，用于边生成边显示 */
+export async function* runNpcEngineStream(input: NpcPromptInput): AsyncGenerator<string> {
+  yield* chatTextStream(npcSystemFilled(input), npcUserPrompt(input), { maxTokens: 400 })
 }

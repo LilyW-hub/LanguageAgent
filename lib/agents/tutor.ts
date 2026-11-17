@@ -49,7 +49,7 @@ function normalizeErrorType(value: unknown): ErrorType {
   return "none"
 }
 
-function normalize(raw: Record<string, unknown>, userMessage: string): Correction {
+export function toCorrection(raw: Record<string, unknown>, userMessage: string): Correction {
   const errorType = normalizeErrorType(raw.errorType)
 
   const corrected = asString(raw.corrected, userMessage)
@@ -88,7 +88,7 @@ export async function runTutor(input: { userMessage: string; level: string }): P
     return { correction: fallback, error: result.error ?? "纠错服务未返回结果" }
   }
 
-  const correction = normalize(result.data, input.userMessage)
+  const correction = toCorrection(result.data, input.userMessage)
 
   // 只看标点/大小写就相同的句子：不算错误，回退成原句（不弹课后卡）
   if (sameExceptPunctuation(correction.corrected, input.userMessage)) {
