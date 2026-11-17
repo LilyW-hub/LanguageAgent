@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import ArchiveCardView from "./ArchiveCardView"
 import ReviewCard from "./ReviewCard"
+import VoiceInput from "./VoiceInput"
 import type { ChatMessage, Npc } from "@/lib/types"
 
 const SUGGESTIONS = [
@@ -25,6 +26,7 @@ export default function ChatView({
   error: string | null
 }) {
   const [draft, setDraft] = useState("")
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -133,6 +135,11 @@ export default function ChatView({
           ))}
         </div>
         <div className="flex items-end gap-2">
+          <VoiceInput
+            onText={(text) => setDraft(text)}
+            onError={setVoiceError}
+            disabled={busy}
+          />
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -143,7 +150,7 @@ export default function ChatView({
               }
             }}
             rows={1}
-            placeholder={`用英语和 ${npc.name} 说话…（Enter 发送）`}
+            placeholder={`用英语和 ${npc.name} 说话，或点麦克风…（Enter 发送）`}
             className="flex-1 resize-none px-3 py-2.5 rounded-xl border border-stone-200 text-sm outline-none focus:border-stone-400 max-h-32"
           />
           <button
@@ -155,6 +162,12 @@ export default function ChatView({
             发送
           </button>
         </div>
+
+        {voiceError && (
+          <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            {voiceError}
+          </div>
+        )}
       </footer>
     </section>
   )
