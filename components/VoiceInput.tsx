@@ -10,8 +10,8 @@ export default function VoiceInput({
   onError,
   disabled,
 }: {
-  /** 识别到的文本（interim 时是实时片段，final 时是整句） */
-  onText: (text: string) => void
+  /** 识别到的文本（interim 时是实时片段，final 时是整句）；final 时附带置信度与候选 */
+  onText: (text: string, meta?: { confidence: number; alternatives: string[] }) => void
   /** 语音相关错误，交给父组件展示 */
   onError?: (message: string | null) => void
   disabled?: boolean
@@ -58,7 +58,7 @@ export default function VoiceInput({
     recognition.lang = "en-US"
     recognition.continuous = false
     recognition.interimResults = true
-    recognition.maxAlternatives = 1
+    recognition.maxAlternatives = 3
 
     recognition.onstart = () => {
       setStatus("listening")
@@ -68,13 +68,25 @@ export default function VoiceInput({
     recognition.onresult = (event) => {
       let finalText = ""
       let interim = ""
+      let confidence = 0
+      const alternatives: string[] = []
+
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i]
         const transcript = result?.[0]?.transcript ?? ""
-        if (result?.isFinal) finalText += transcript
-        else interim += transcript
+        if (result?.isFinal) {
+          finalText += transcript
+          confidence = result[0]?.confidence ?? 0
+          for (let j = 0; j < result.length; j += 1) {
+            const alternative = result[j]?.transcript
+            if (alternative && alternative.trim().length > 0) alternatives.push(alternative)
+          }
+        } else {
+          interim += transcript
+        }
       }
-      if (finalText.trim().length > 0) onText(finalText.trim())
+
+      if (finalText.trim().length > 0) onText(finalText.trim(), { confidence, alternatives })
       else if (interim.trim().length > 0) onText(interim.trim())
     }
 
@@ -145,7 +157,9 @@ export default function VoiceInput({
             onError?.(message)
             return
           }
-          if (data.text && data.text.trim().length > 0) onText(data.text.trim())
+          if (data.text && data.text.trim().length > 0) {
+            onText(data.text.trim(), { confidence: 0, alternatives: [] })
+          }
           else onError?.("没有识别出内容")
         } catch (cause) {
           onError?.(cause instanceof Error ? cause.message : String(cause))

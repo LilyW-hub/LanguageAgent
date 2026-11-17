@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react"
 import ArchiveCardView from "./ArchiveCardView"
 import NpcAvatar from "./NpcAvatar"
+import PronunciationCard from "./PronunciationCard"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
-import type { ChatMessage, Npc } from "@/lib/types"
+import { assessPronunciation } from "@/lib/pronunciation"
+import type { ChatMessage, Npc, PronunciationFeedback } from "@/lib/types"
 
 export default function ChatView({
   npc,
@@ -16,13 +18,14 @@ export default function ChatView({
 }: {
   npc: Npc
   messages: ChatMessage[]
-  onSend: (text: string) => void
+  onSend: (text: string, pronunciation?: PronunciationFeedback | null) => void
   busy: boolean
   error: string | null
 }) {
   const [draft, setDraft] = useState("")
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [stage, setStage] = useState(0)
+  const [voiceMeta, setVoiceMeta] = useState<PronunciationFeedback | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -47,8 +50,9 @@ export default function ChatView({
   function submit() {
     const text = draft.trim()
     if (!text || busy) return
-    onSend(text)
+    onSend(text, voiceMeta)
     setDraft("")
+    setVoiceMeta(null)
   }
 
   return (
@@ -97,6 +101,14 @@ export default function ChatView({
                 {message.content}
               </div>
             </div>
+
+            {message.pronunciation && (
+              <div className="flex justify-end">
+                <div className="max-w-[78%]">
+                  <PronunciationCard feedback={message.pronunciation} />
+                </div>
+              </div>
+            )}
 
             {message.correction && (
               <div className="max-w-[78%] mt-1">
@@ -154,13 +166,27 @@ export default function ChatView({
         </div>
         <div className="flex items-end gap-2">
           <VoiceInput
-            onText={(text) => setDraft(text)}
+            onText={(text, meta) => {
+              setDraft(text)
+              setVoiceMeta(
+                meta
+                  ? assessPronunciation({
+                      transcript: text,
+                      confidence: meta.confidence,
+                      alternatives: meta.alternatives,
+                    })
+                  : null,
+              )
+            }}
             onError={setVoiceError}
             disabled={busy}
           />
           <textarea
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value)
+              if (voiceMeta) setVoiceMeta(null)
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault()

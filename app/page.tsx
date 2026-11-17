@@ -7,7 +7,14 @@ import Onboarding from "@/components/Onboarding"
 import ProfilePanel from "@/components/ProfilePanel"
 import TracePanel from "@/components/TracePanel"
 import { DEFAULT_NPC_ID, getNpc, listNpcs } from "@/lib/npcs"
-import type { ChatMessage, ChatResponse, Level, Profile, TraceStep } from "@/lib/types"
+import type {
+  ChatMessage,
+  ChatResponse,
+  Level,
+  Profile,
+  PronunciationFeedback,
+  TraceStep,
+} from "@/lib/types"
 
 let messageSeq = 0
 function nextId(prefix: string): string {
@@ -111,7 +118,7 @@ export default function Home() {
     seedOpening(id)
   }
 
-  async function handleSend(text: string) {
+  async function handleSend(text: string, pronunciation?: PronunciationFeedback | null) {
     if (!profile || busy) return
     setBusy(true)
     setError(null)
@@ -121,7 +128,12 @@ export default function Home() {
       ...prev,
       [targetNpc]: [
         ...(prev[targetNpc] ?? []),
-        { id: nextId("user"), role: "user", content: text },
+        {
+          id: nextId("user"),
+          role: "user",
+          content: text,
+          pronunciation: pronunciation ?? null,
+        },
       ],
     }))
 

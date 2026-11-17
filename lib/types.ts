@@ -59,12 +59,25 @@ export interface ProfileDelta {
   weaknesses?: string[]
 }
 
+/** 发音清晰度反馈（本地启发式或云端评测） */
+export interface PronunciationFeedback {
+  clarity: "clear" | "fair" | "unclear" | "unknown"
+  /** 0–100；浏览器未提供置信度时为 null */
+  score: number | null
+  transcript: string
+  alternatives: string[]
+  advice: string
+  /** 数据来源：local=浏览器置信度启发式，cloud=云端音素级评测 */
+  source?: "local" | "cloud"
+}
+
 export interface ChatMessage {
   id: string
   role: "user" | "npc"
   content: string
   correction?: Correction | null
   archiveCard?: ArchiveCard | null
+  pronunciation?: PronunciationFeedback | null
 }
 
 export interface ChatResponse {

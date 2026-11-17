@@ -117,6 +117,27 @@ curl -X POST localhost:3000/api/mode -d '{"replay":false}' -H 'Content-Type: app
 - Safari 对 Web Speech 支持不稳定，**建议演示用 Chrome**。
 - 语音会把识别结果直接写入输入框，发送前可以手动修改（推荐这样做——纠错功能正是用来处理不完美表达的）。
 
+### 发音反馈
+
+`lib/pronunciation.ts` 会基于两个**真实信号**给出清晰度判断：
+
+1. **识别置信度**（Web Speech 的 `confidence`）
+2. **多候选分歧**（`maxAlternatives=3`，次选候选与首选的编辑距离）
+
+输出「清晰 / 一般 / 偏含糊」，并给出可执行建议（放慢、补全词尾辅音、拆短句…）。
+对话里每条语音消息下方会显示这张小卡。
+
+**局限（重要）**：这是启发式，衡量的是「机器听你的话有多确定」，不是音素级评测。
+它能发现「说不清」，但无法像专业评测那样定位到某个音节错在哪。
+浏览器不返回置信度时（部分环境 `confidence=0`），会如实显示「无置信度」，**不臆造分数**。
+
+**升级到真评测**：配置 `PRONUNCIATION_BASE_URL` + `PRONUNCIATION_API_KEY`，
+让 `/api/pronunciation` 对接 Azure 语音评测 / 讯飞 / 阿里云 GoP 服务，返回 `source: "cloud"`，
+前端 UI 无需改动。
+
+> 当前使用的 `api.openai-next.com` 代理**不支持音频接口**（whisper 超时、audio-preview 一律 429），
+> 所以云端评测暂时无法启用。换 key 后即可。
+
 ### 启用后端 ASR（可选）
 
 ```bash
