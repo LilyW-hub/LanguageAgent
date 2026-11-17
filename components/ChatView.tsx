@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import ArchiveCardView from "./ArchiveCardView"
+import NpcAvatar from "./NpcAvatar"
 import ReviewCard from "./ReviewCard"
 import VoiceInput from "./VoiceInput"
 import type { ChatMessage, Npc } from "@/lib/types"
@@ -58,20 +59,16 @@ export default function ChatView({
 
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
-      {/* 场景背景 */}
+      {/* 场景背景：渐变打底 + 场景图叠加，离线可用 */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: npc.bg }} />
       <div
-        className="absolute inset-0 opacity-40 pointer-events-none"
-        style={{ background: npc.bg }}
+        className="absolute inset-0 pointer-events-none opacity-25 bg-cover bg-center"
+        style={{ backgroundImage: `url(${npc.sceneImage})` }}
       />
 
       <header className="relative px-5 py-3 border-b border-stone-200 bg-white/80 backdrop-blur">
         <div className="flex items-center gap-3">
-          <div
-            className="h-9 w-9 rounded-full flex items-center justify-center text-base"
-            style={{ background: npc.bg }}
-          >
-            {npc.avatarEmoji}
-          </div>
+          <NpcAvatar npc={npc} size={38} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-medium text-stone-900">{npc.name}</span>

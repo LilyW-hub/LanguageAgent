@@ -13,6 +13,8 @@ interface StoreState {
   archives: ArchiveCard[]
   trace: TraceStep[]
   turn: number
+  /** 回放模式：不调用模型，走 lib/demoScript.ts 的剧本（现场兜底） */
+  replay: boolean
 }
 
 function createStore(): StoreState {
@@ -23,6 +25,7 @@ function createStore(): StoreState {
     archives: [],
     trace: [],
     turn: 0,
+    replay: false,
   }
 }
 
@@ -38,6 +41,14 @@ export function getProfile(): Profile | null {
 
 export function setProfile(profile: Profile): void {
   store.profile = profile
+}
+
+export function getReplayMode(): boolean {
+  return store.replay
+}
+
+export function setReplayMode(value: boolean): void {
+  store.replay = value
 }
 
 export function resetStore(): void {

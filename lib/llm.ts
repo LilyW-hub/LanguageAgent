@@ -3,8 +3,35 @@ import OpenAI from "openai"
 /** 模型名（可换成本地/云端任意兼容端点） */
 export const MODEL = process.env.MODEL_NAME ?? "deepseek-v4-flash"
 
-/** 单次请求超时（毫秒） */
+/** SDK 级超时（毫秒） */
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 60000)
+
+/** 单次请求超时：演示场景下宁可快速失败重试，也别让用户干等 60 秒 */
+const REQUEST_TIMEOUT_MS = Number(process.env.LLM_REQUEST_TIMEOUT_MS ?? 25000)
+
+/** 可重试的失败：限流、服务端错误、网络抖动、超时 */
+function isRetryable(error: unknown): boolean {
+  if (error instanceof OpenAI.APIError) {
+    const status = error.status ?? 0
+    return status === 429 || status === 0 || status >= 500
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  if (/缺少 OPENAI_API_KEY|占位符|认证失败|无权限/.test(message)) return false
+  return /timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|fetch failed|aborted|socket hang up/i.test(
+    message,
+  )
+}
+
+/** 轻量重试：2 次尝试，失败间隔 600ms */
+async function withRetry<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (error) {
+    if (!isRetryable(error)) throw error
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    return await run()
+  }
+}
 
 let client: OpenAI | null = null
 
@@ -79,28 +106,36 @@ export async function chatText(
   options: { maxTokens?: number; temperature?: number } = {},
 ): Promise<string> {
   try {
-    const res = await llm().chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature: options.temperature ?? 0.8,
-      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-    })
+    const res = await withRetry(() =>
+      llm().chat.completions.create(
+        {
+          model: MODEL,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: options.temperature ?? 0.8,
+          ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        },
+        { timeout: REQUEST_TIMEOUT_MS },
+      ),
+    )
     const text = (res.choices[0]?.message?.content ?? "").trim()
     if (text.length > 0) return text
 
     // 空内容常见于 max_tokens 被推理/截断吃满：去掉上限重试一次
     if (options.maxTokens) {
-      const retry = await llm().chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature: options.temperature ?? 0.8,
-      })
+      const retry = await llm().chat.completions.create(
+        {
+          model: MODEL,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: options.temperature ?? 0.8,
+        },
+        { timeout: REQUEST_TIMEOUT_MS },
+      )
       const retryText = (retry.choices[0]?.message?.content ?? "").trim()
       if (retryText.length > 0) return retryText
     }
@@ -134,13 +169,18 @@ export async function chatJson<T>(
 
   // 第一次：强制 JSON 模式
   try {
-    const res = await llm().chat.completions.create({
-      model: MODEL,
-      messages,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-    })
+    const res = await withRetry(() =>
+      llm().chat.completions.create(
+        {
+          model: MODEL,
+          messages,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        },
+        { timeout: REQUEST_TIMEOUT_MS },
+      ),
+    )
     const parsed = extractJson(res.choices[0]?.message?.content ?? "")
     if (parsed) return { data: parsed as T, error: null }
     lastError = "模型未返回合法 JSON"
@@ -154,12 +194,15 @@ export async function chatJson<T>(
 
   // 第二次：纯提示词约束
   try {
-    const res = await llm().chat.completions.create({
-      model: MODEL,
-      messages,
-      temperature: 0,
-      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-    })
+    const res = await llm().chat.completions.create(
+      {
+        model: MODEL,
+        messages,
+        temperature: 0,
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+      },
+      { timeout: REQUEST_TIMEOUT_MS },
+    )
     const parsed = extractJson(res.choices[0]?.message?.content ?? "")
     if (parsed) return { data: parsed as T, error: null }
     return { data: null, error: lastError ?? "模型未返回合法 JSON" }

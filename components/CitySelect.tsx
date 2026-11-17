@@ -1,5 +1,6 @@
 "use client"
 
+import NpcAvatar from "./NpcAvatar"
 import type { Npc } from "@/lib/types"
 
 export default function CitySelect({
@@ -43,12 +44,7 @@ export default function CitySelect({
               }`}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-lg shrink-0"
-                  style={{ background: npc.bg }}
-                >
-                  {npc.avatarEmoji}
-                </div>
+                <NpcAvatar npc={npc} size={40} />
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-stone-900 truncate">{npc.name}</div>
                   <div className="text-xs text-stone-500 truncate">

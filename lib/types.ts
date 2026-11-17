@@ -95,6 +95,8 @@ export interface Npc {
   opening: string
   story: string
   avatarEmoji: string
+  /** 场景背景图（public/scenes 下的 SVG） */
+  sceneImage: string
   accent: string
   bg: string
 }

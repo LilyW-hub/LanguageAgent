@@ -25,6 +25,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
+  const [replay, setReplay] = useState(false)
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -36,7 +37,9 @@ export default function Home() {
           return
         }
         const where = data.config ? `${data.config.baseURL} · ${data.config.model}` : ""
-        setHealthError(`${data.error ?? "模型不可用"}${where ? `（${where}）` : ""}`)
+        setHealthError(
+          `${data.error ?? "模型不可用"}${where ? `（${where}）` : ""}　—　可点右上角「回放」继续演示`,
+        )
       })
       .catch(() => setHealthError("无法访问 /api/health，请确认 dev 服务在运行"))
   }, [])
@@ -57,8 +60,9 @@ export default function Home() {
     let cancelled = false
     fetch("/api/onboard")
       .then((res) => res.json())
-      .then((data: { profile: Profile | null }) => {
+      .then((data: { profile: Profile | null; replay?: boolean }) => {
         if (cancelled) return
+        if (typeof data.replay === "boolean") setReplay(data.replay)
         if (data.profile) {
           setProfile(data.profile)
           seedOpening(DEFAULT_NPC_ID)
@@ -159,6 +163,26 @@ export default function Home() {
     }
   }
 
+  async function toggleReplay() {
+    const next = !replay
+    setBusy(true)
+    try {
+      const res = await fetch("/api/mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replay: next }),
+      })
+      const data = (await res.json()) as { replay?: boolean; error?: string }
+      if (!res.ok) throw new Error(data.error ?? `切换失败（${res.status}）`)
+      setReplay(Boolean(data.replay))
+      setError(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleReset() {
     await fetch("/api/reset", { method: "POST" }).catch(() => undefined)
     setProfile(null)
@@ -242,8 +266,21 @@ export default function Home() {
           </button>
           <button
             type="button"
+            onClick={toggleReplay}
+            disabled={busy}
+            className={`ml-auto mb-1 text-[11px] px-2 py-1 rounded border transition ${
+              replay
+                ? "border-amber-400 bg-amber-100 text-amber-800"
+                : "border-stone-200 text-stone-500 hover:border-stone-400"
+            }`}
+            title="回放模式：不调用模型，按剧本演示（现场兜底）"
+          >
+            {replay ? "▶ 回放中" : "回放"}
+          </button>
+          <button
+            type="button"
             onClick={handleReset}
-            className="ml-auto mr-1 mb-1 text-[11px] px-2 py-1 rounded border border-stone-200 text-stone-500 hover:border-stone-400"
+            className="mr-1 mb-1 text-[11px] px-2 py-1 rounded border border-stone-200 text-stone-500 hover:border-stone-400"
             title="清空所有状态，回到 Onboarding"
           >
             重置

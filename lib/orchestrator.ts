@@ -2,6 +2,7 @@ import { runNpcEngine } from "./agents/npcEngine"
 import { runProfileExtractor } from "./agents/profileExtractor"
 import { runTutor } from "./agents/tutor"
 import { buildMemorySummary } from "./agents/memory"
+import { fallbackReply, findScriptedTurn } from "./demoScript"
 import { getNpc } from "./npcs"
 import {
   addArchive,
@@ -10,10 +11,11 @@ import {
   applyProfileDelta,
   getHistory,
   getProfile,
+  getReplayMode,
   nextTurn,
   pushTurn,
 } from "./store"
-import type { ArchiveCard, ChatResponse, TraceStep } from "./types"
+import type { ArchiveCard, ChatResponse, Correction, TraceStep } from "./types"
 
 const CITY_LABEL: Record<string, string> = { London: "伦敦" }
 
@@ -35,6 +37,12 @@ export async function handleChat(input: {
   }
 
   const npc = getNpc(input.npcId)
+
+  // 回放模式：不调用模型，按剧本返回（现场兜底）
+  if (getReplayMode()) {
+    return handleReplayChat({ message: input.message, npcId: input.npcId, profile })
+  }
+
   const turn = nextTurn()
   const trace: TraceStep[] = []
 
@@ -135,5 +143,116 @@ export async function handleChat(input: {
     archiveCard,
     trace,
     profile,
+  }
+}
+
+/**
+ * 回放模式：走 lib/demoScript.ts 的剧本。
+ * 输出结构与真实链路一致（reply / correction / profileDelta / archiveCard / trace），
+ * 前端无需任何改动，切回来就是实时模型。
+ */
+function handleReplayChat(input: {
+  message: string
+  npcId: string
+  profile: NonNullable<ReturnType<typeof getProfile>>
+}): ChatResponse {
+  const npc = getNpc(input.npcId)
+  const turn = nextTurn()
+  const trace: TraceStep[] = []
+  const scripted = findScriptedTurn(npc.id, input.message)
+
+  const memory = buildMemorySummary(input.profile, npc)
+  trace.push({
+    turn,
+    agent: "memory",
+    action: `读取画像 → ${memory.focus.join(" / ")}`,
+    detail: `${memory.summary}（回放模式）`,
+  })
+
+  const correction: Correction = scripted?.correction ?? {
+    original: input.message,
+    corrected: input.message,
+    errorType: "none",
+    explanation: "",
+    natural: input.message,
+    addToReview: false,
+  }
+
+  trace.push({
+    turn,
+    agent: "tutor",
+    action:
+      correction.errorType === "none"
+        ? "未检测到明显错误"
+        : `检测到 ${correction.errorType} → corrected "${correction.corrected}"`,
+    detail: correction.explanation || undefined,
+  })
+
+  const reply = scripted?.reply ?? fallbackReply(npc.id)
+
+  trace.push({
+    turn,
+    agent: "npc",
+    action:
+      correction.errorType === "none"
+        ? `${npc.name} 生成回复`
+        : `${npc.name} 用 corrected 生成回复（diegetic 纠错）`,
+  })
+
+  const profileDelta =
+    scripted?.inferred || scripted?.weaknesses
+      ? {
+          ...(scripted.inferred
+            ? { inferred: scripted.inferred.map((item) => ({ ...item, sourceTurn: turn })) }
+            : {}),
+          ...(scripted.weaknesses ? { weaknesses: scripted.weaknesses } : {}),
+        }
+      : null
+
+  applyProfileDelta(profileDelta)
+
+  const inferredCount = profileDelta?.inferred?.length ?? 0
+  const weaknessCount = profileDelta?.weaknesses?.length ?? 0
+
+  trace.push({
+    turn,
+    agent: "profile",
+    action:
+      inferredCount + weaknessCount === 0
+        ? "无新的画像信号"
+        : [
+            inferredCount > 0
+              ? `推测 ${profileDelta?.inferred?.map((item) => `${item.fact} (${item.confidence.toFixed(1)})`).join(", ")}`
+              : "",
+            weaknessCount > 0 ? `记录薄弱点 ${profileDelta?.weaknesses?.join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join(" / "),
+  })
+
+  let archiveCard: ArchiveCard | null = null
+  if (correction.errorType !== "none") {
+    archiveCard = {
+      title: `${CITY_LABEL[npc.city] ?? npc.city}·${npc.sceneLabel}日常用语`,
+      city: npc.city,
+      category: "Life",
+      summary: `${npc.learningObjective} · ${correction.errorType}: ${correction.explanation || correction.corrected}`,
+    }
+    addArchive(archiveCard)
+  }
+
+  pushTurn(npc.id, { role: "user", content: input.message })
+  pushTurn(npc.id, { role: "npc", content: reply })
+  if (correction.errorType !== "none") addCorrection(correction)
+  addTrace(trace)
+
+  return {
+    reply,
+    learningObjective: npc.learningObjective,
+    correction: correction.errorType === "none" ? null : correction,
+    profileDelta,
+    archiveCard,
+    trace,
+    profile: input.profile,
   }
 }

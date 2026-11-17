@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getProfile, setProfile } from "@/lib/store"
+import { getProfile, getReplayMode, setProfile } from "@/lib/store"
 import type { Level, Profile } from "@/lib/types"
 
 export const runtime = "nodejs"
@@ -43,5 +43,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ profile: getProfile() })
+  return NextResponse.json({ profile: getProfile(), replay: getReplayMode() })
 }

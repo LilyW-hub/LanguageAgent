@@ -80,6 +80,29 @@ Agent 感由右侧 **Trace 面板**实时呈现。
 
 ---
 
+## 演示兜底：回放模式
+
+右上角有一个「回放」按钮。点开后**完全不调用模型**，改走 `lib/demoScript.ts` 的剧本，
+整条黄金路径（diegetic 纠错 → 课后卡 → 档案卡 → 画像更新 → Trace）依然完整。
+
+用途：现场无网、限流、模端点抽风时，一键切过去照样能演。剧本可用关键词命中，
+演示者带不带标点、怎么说都能命中同一段。
+
+```bash
+curl -X POST localhost:3000/api/mode -d '{"replay":true}' -H 'Content-Type: application/json'
+curl -X POST localhost:3000/api/mode -d '{"replay":false}' -H 'Content-Type: application/json'
+```
+
+---
+
+## 视觉资产
+
+- **场景背景**：`public/scenes/coffee.svg`、`street.svg`（矢量、离线可用、体积 KB 级）
+- **NPC 头像**：把图片放到 `public/avatars/<id>.png`（如 `maya.png` / `leo.png`）即自动生效；
+  没有图片时回退到 emoji 徽章，不会出现破图。
+
+---
+
 ## 语音输入
 
 底部输入框左侧的 🎤 按钮支持**英语语音输入**，自动降级三级：
