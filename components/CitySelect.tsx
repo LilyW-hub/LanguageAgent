@@ -8,15 +8,24 @@ export default function CitySelect({
   activeId,
   onSelect,
   archivesCount,
+  onBack,
 }: {
   npcs: Npc[]
   activeId: string
   onSelect: (id: string) => void
   archivesCount: number
+  onBack: () => void
 }) {
   return (
     <aside className="w-64 shrink-0 border-r border-stone-200 bg-white/70 flex flex-col">
       <div className="px-4 py-4 border-b border-stone-200">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-2 text-[11px] text-stone-500 hover:text-stone-900"
+        >
+          ← 返回世界地图
+        </button>
         <div className="text-xs tracking-widest text-stone-400">EXPLORE</div>
         <div className="mt-1 flex items-center gap-1.5 text-stone-800 font-medium">
           <span>📍</span>

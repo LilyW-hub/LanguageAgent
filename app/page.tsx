@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import ArchivePanel, { type ArchiveEntry } from "@/components/ArchivePanel"
 import ChatView from "@/components/ChatView"
+import WorldMap from "@/components/WorldMap"
 import CitySelect from "@/components/CitySelect"
 import Onboarding from "@/components/Onboarding"
 import ProfilePanel from "@/components/ProfilePanel"
@@ -53,6 +54,7 @@ export default function Home() {
   const [healthError, setHealthError] = useState<string | null>(null)
   const [replay, setReplay] = useState(false)
   const [stage, setStage] = useState(0)
+  const [view, setView] = useState<"map" | "city">("map")
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -272,6 +274,7 @@ export default function Home() {
     setNpcId(DEFAULT_NPC_ID)
     setError(null)
     setTab("profile")
+    setView("map")
   }
 
   if (!ready) {
@@ -297,8 +300,6 @@ export default function Home() {
     )
   }
 
-  const npc = getNpc(npcId)
-
   const archiveEntries: ArchiveEntry[] = Object.entries(messages).flatMap(([id, list]) =>
     list
       .filter((message) => message.archiveCard)
@@ -306,6 +307,17 @@ export default function Home() {
   )
 
   const archives = archiveEntries
+
+  if (view === "map") {
+    return (
+      <>
+        {healthBanner}
+        <WorldMap archives={archives.length} onEnterLondon={() => setView("city")} />
+      </>
+    )
+  }
+
+  const npc = getNpc(npcId)
 
   return (
     <>
@@ -316,6 +328,7 @@ export default function Home() {
         activeId={npcId}
         onSelect={handleSelectNpc}
         archivesCount={archives.length}
+        onBack={() => setView("map")}
       />
 
       <ChatView
