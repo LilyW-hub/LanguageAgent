@@ -367,6 +367,7 @@ export default function Home() {
       <>
         {healthBanner}
         <WorldMap
+          peopleCount={npcs.length}
           archives={archives.length}
           xp={Object.values(rewards)[0]?.total ?? 0}
           level={Object.values(rewards)[0]?.level ?? 1}
