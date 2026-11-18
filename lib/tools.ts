@@ -1,3 +1,5 @@
+import { isTaskCompletionArchive } from "./archiveContent"
+import { randomUUID } from "node:crypto"
 import { lookupWord } from "./dictionary"
 import { addArchive, addReview, countArchives, countReviews } from "./store"
 import type { ArchiveCard, Correction, Npc } from "./types"
@@ -113,6 +115,8 @@ export async function executeTool(
     const cityLabel = npc.city === "London" ? "伦敦" : npc.city
     const rawTitle = asString(call.args.title, `${cityLabel}·${npc.sceneLabel}日常用语`)
     const card: ArchiveCard = {
+      id: randomUUID(),
+      npcId: npc.id,
       // 模型可能用英文城市名，统一成中文展示
       title: (() => {
         const localized = rawTitle
@@ -137,6 +141,9 @@ export async function executeTool(
       ),
     }
 
+    if (isTaskCompletionArchive(card)) {
+      return { name: call.name, args: call.args, ok: false, summary: "任务完成情况已归入成长，不创建知识档案" }
+    }
     addArchive(card)
 
     return {

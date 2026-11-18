@@ -5,7 +5,7 @@ import type { Npc } from "@/lib/types"
 
 /**
  * 人设卡：把「这是谁」讲清楚。
- * 内容全部来自人工审校的人设卡（lib/npcs.ts），不是模型生成的。
+ * 展示预设角色或模型生成并保存的角色资料。
  */
 export default function PersonaCard({ npc, onClose }: { npc: Npc; onClose: () => void }) {
   const traits = npc.personality

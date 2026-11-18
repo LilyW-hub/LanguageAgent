@@ -1,0 +1,82 @@
+// Isolated service tests: no network requests or changes to the user's records.
+const ts = require("typescript")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+const assert = require("node:assert/strict")
+const root = path.resolve(__dirname, "..")
+require.extensions[".ts"] = (mod, file) => mod._compile(ts.transpileModule(fs.readFileSync(file,"utf8"), {
+  compilerOptions: { module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2020 },
+}).outputText, file)
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "language-learning-"))
+process.chdir(temporary)
+const replies = []
+const llmPath = path.join(root,"lib/llm.ts")
+require.cache[llmPath] = {id:llmPath,filename:llmPath,loaded:true,exports:{
+  chatText: async () => { assert.ok(replies.length, "Unexpected model call"); return JSON.stringify(replies.shift()) },
+  extractJson: JSON.parse,
+}}
+const store = require(path.join(root,"lib/store.ts"))
+const learning = require(path.join(root,"lib/archiveLearning.ts"))
+const registry = require(path.join(root,"lib/npcRegistry.ts"))
+
+async function main() {
+  const {growthSteps}=require(path.join(root,"lib/questProgress.ts"))
+  const {recordGrowth,getGrowth}=require(path.join(root,"lib/growth.ts"))
+  const maya=registry.getNpc("maya")
+  assert.ok(growthSteps(maya).every(step=>!step.completed))
+  recordGrowth("maya",1)
+  const progress=growthSteps(maya,getGrowth()[0])
+  assert.equal(progress.find(step=>step.id==="order").completed,true,"Completed order is checked")
+  assert.equal(progress.filter(step=>step.completed).length,2)
+  assert.equal(progress[2].completed,false,"Later steps must remain unchecked")
+  const legacy={id:"old-task",npcId:"maya",title:"伦敦·咖啡馆·点单",city:"伦敦",category:"Life",summary:"完成「点单」这一步的交流"}
+  globalThis.__langAgentStore.archives.push(legacy)
+  assert.deepEqual(store.getArchives(),[],"Migrate task-only archives out of the archive collection")
+  assert.equal(getGrowth()[0].index,1,"Archive migration preserves task progress")
+  store.addArchive(legacy)
+  assert.equal(store.countArchives(),0,"Task-only archives cannot be saved again")
+  store.resetStore()
+  const card = {id:"test-archive",npcId:"maya",title:"Polite coffee requests",summary:"Use Could I have a coffee, please? for polite requests.",city:"伦敦",category:"Language"}
+  store.addArchive(card)
+  assert.equal(learning.archiveContext(registry.getNpc("maya"),"coffee",1),"")
+  assert.match(learning.archiveContext(registry.getNpc("maya"),"coffee",3),/Polite coffee requests/)
+  await assert.rejects(learning.startPractice("missing"),/档案不存在/)
+  replies.push({question:"请礼貌地向店员点茶。",goal:"礼貌请求",answerGuide:"Could I have a tea, please?"})
+  const exercise = await learning.startPractice(card.id)
+  assert.ok(exercise.id)
+  assert.equal(exercise.answerGuide,undefined,"Must not expose the answer before submission")
+  replies.push({passed:true,feedback:"正确使用了礼貌请求。",example:"Could I have a tea, please?"})
+  const result=await learning.answerPractice(exercise.id,"Could I have a tea, please?")
+  assert.equal(result.passed,true)
+  assert.deepEqual(await learning.answerPractice(exercise.id,"another answer"),result,"Already graded answers stay stable")
+  assert.equal(store.getQuestStep("maya"),0,"Archive practice must not complete scene tasks")
+  replies.push({question:{scenario:"咖啡馆",prompt:"Please order politely."},goal:["礼貌请求"],answerGuide:{example:"Could I have tea, please?",criteria:["使用礼貌请求","表达清楚"]}})
+  const structured=await learning.startPractice(card.id)
+  assert.match(structured.question,/Please order politely/)
+  assert.equal(structured.goal,"礼貌请求")
+  assert.equal(structured.answerGuide,undefined)
+  replies.push({passed:false,feedback:{reason:"缺少礼貌请求"},example:["Could I have tea, please?"]})
+  const structuredResult=await learning.answerPractice(structured.id,"tea")
+  assert.match(structuredResult.feedback,/缺少礼貌请求/)
+  replies.push({question:"Incomplete"})
+  await assert.rejects(learning.startPractice(card.id),/完整练习/)
+  const rawNpc={name:"Nora",age:42,profession:"Librarian",scene:"Library",sceneLabel:"图书馆",personality:"严谨但温暖，喜欢按颜色整理便签",speechStyle:"短句，常用书籍比喻",interests:["books","local history","gardening"],learningObjective:"办理借书证",opening:"Hello! Are you looking for a book or a library card?",story:"在社区图书馆工作十五年。",questTitle:"办理借书证",questBrief:"询问办证要求并确认信息",steps:[{label:"申请办证",cues:["card"]},{label:"提供住址",cues:["address"]},{label:"确认借阅要求",cues:["borrow"]}]}
+  const before=registry.listNpcs().length
+  replies.push(rawNpc)
+  const npc=await registry.generateNpc()
+  assert.equal(registry.listNpcs().length,before+1)
+  assert.equal(registry.getNpc(npc.id).name,"Nora")
+  assert.equal(npc.quest.steps.length,4)
+  assert.ok(fs.existsSync(path.join(temporary,".data/npcs.json")))
+  replies.push({...rawNpc,name:"Other"})
+  await assert.rejects(registry.generateNpc(),/过于相似/)
+  assert.equal(registry.listNpcs().length,before+1,"Duplicate NPC must not be saved")
+  replies.push({...rawNpc,steps:[{label:"empty",cues:[]}]})
+  await assert.rejects(registry.generateNpc(),/任务格式无效/)
+  store.resetStore()
+  await assert.rejects(learning.answerPractice(exercise.id,"answer"),/档案已被重置/)
+  assert.equal(replies.length,0)
+  console.log("PASS: archive exercises, grading, task isolation, review cadence, NPC generation, persistence and duplicate validation")
+}
+main().catch(error => { console.error(error); process.exitCode=1 })

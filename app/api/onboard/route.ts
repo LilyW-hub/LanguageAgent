@@ -1,5 +1,7 @@
+import { listNpcs } from "@/lib/npcRegistry"
+import { getGrowth } from "@/lib/growth"
 import { NextResponse } from "next/server"
-import { getProfile, getReplayMode, setProfile } from "@/lib/store"
+import { getArchives, getProfile, setProfile } from "@/lib/store"
 import type { Level, Profile } from "@/lib/types"
 
 export const runtime = "nodejs"
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     setProfile(profile)
-    return NextResponse.json({ profile })
+    return NextResponse.json({ profile, growth: getGrowth(), archives: getArchives(), npcs: listNpcs() })
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ error: reason }, { status: 500 })
@@ -43,5 +45,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ profile: getProfile(), replay: getReplayMode() })
+  return NextResponse.json({ profile: getProfile(), growth: getGrowth(), archives: getArchives(), npcs: listNpcs() })
 }

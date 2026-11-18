@@ -13,10 +13,10 @@ cp .env.example .env.local
 # 编辑 .env.local，填入 OPENAI_API_KEY（以及 OPENAI_BASE_URL / MODEL_NAME）
 
 # 2) 安装依赖
-npm install     # 或 pnpm install
+sh scripts/node-env.sh npm ci     # 使用项目隔离环境
 
 # 3) 启动
-npm run dev     # http://localhost:3000
+sh scripts/node-env.sh npm run dev     # http://localhost:3000
 ```
 
 演示前想重置所有状态：点右上角「重置」，或 `curl -X POST http://localhost:3000/api/reset`。
@@ -289,3 +289,31 @@ ASR_LANGUAGE=en
 所以「减少调用次数」比「优化生成速度」有效得多。
 
 界面阶段提示（🧠 读取画像 → 🩺 理解表达 → 🎭 正在回复）由服务端 `stage` 事件驱动，不是假进度。
+
+## 项目隔离环境
+
+Node 版本固定在 `.node-version`，运行时放在 `.runtime/`，npm 缓存也在该目录；依赖放在项目 `node_modules/`。这些目录不会提交到 Git，不修改系统 Node 或 shell 配置。这是运行时和依赖隔离，不是容器安全沙箱。
+
+当前 macOS Apple Silicon 环境已安装后，可直接使用：
+
+```sh
+sh scripts/node-env.sh npm ci
+sh scripts/node-env.sh npm run dev
+sh scripts/node-env.sh npm run build
+sh scripts/node-env.sh npx tsc --noEmit
+```
+
+新机器需先从 Node.js 官网下载 `.node-version` 指定版本、对应系统架构的发行包，核对官方 SHA256 后解压到 `.runtime/`，保留发行包目录名。
+
+## 档案练习与新角色
+
+- 在「档案」中点击「针对这个知识点练习」，生成情境题并提交英语答案，获得知识点反馈和参考表达。练习记录独立保存，不会替代场景任务完成证据。
+- 左侧点击「探索新角色」，由当前配置的模型自动设计职业、性格、口吻、背景和专属生活任务。生成期间不可重复提交；相同姓名、职业或场景会被拦截。角色自动保存。
+- NPC 对话每三轮尝试选择相关档案，将知识点融入当前生活情境；无相关素材则正常聊天，不要求每轮复习。
+- 档案、练习、新角色和成长记录保存在本机 `.data/`，不提交 Git。当前为本地单用户模式。重置会清空档案与成长；生成角色保留。
+
+隔离测试（不联网、不改用户记录）：
+
+```sh
+sh scripts/node-env.sh npm run test:learning
+```
