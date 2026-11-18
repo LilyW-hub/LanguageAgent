@@ -137,19 +137,43 @@ function parseMeta(raw: string, userMessage: string): MetaBundle {
   }
 }
 
-/** 把模型给的计划步骤映射成本地任务进度；非法步骤不前进 */
+/** 判断这句话是否构成「完成这一步」的证据 */
+function stepEvidence(step: { cues?: string[]; minWords?: number }, message: string): boolean {
+  const text = message.toLowerCase()
+  if (step.minWords && text.split(/\s+/).filter(Boolean).length >= step.minWords) return true
+  if (!step.cues || step.cues.length === 0) return true
+  return step.cues.some((cue) => text.includes(cue))
+}
+
+/**
+ * 把模型给的计划步骤映射成本地任务进度。
+ *
+ * 两条约束（防止「聊几句任务就自动走完」）：
+ * 1. 每轮最多前进一步
+ * 2. 下一步必须被**用户这句话的内容**证明——命中该步的 cues，或达到 minWords。
+ *    证据不足就停在原地，并把原因写进 trace。
+ */
 function resolvePlan(
   npc: ReturnType<typeof getNpc>,
   stepId: string | null,
   reason: string | null,
-): { plan: QuestPlan; advanced: boolean } {
+  message: string,
+): { plan: QuestPlan; advanced: boolean; blockedBy: string | null } {
   const steps = npc.quest.steps
   const currentIndex = getQuestStep(npc.id)
 
-  let targetIndex = currentIndex
   const found = stepId ? steps.findIndex((step) => step.id === stepId) : -1
-  // 每轮最多前进一步：避免模型一次性跳到收尾
-  if (found >= 0) targetIndex = Math.min(found, currentIndex + 1)
+  let targetIndex = currentIndex
+  let blockedBy: string | null = null
+
+  if (found > currentIndex) {
+    const next = steps[currentIndex + 1]
+    if (next && stepEvidence(next, message)) {
+      targetIndex = Math.min(found, currentIndex + 1)
+    } else if (next) {
+      blockedBy = next.label
+    }
+  }
 
   const advanced = targetIndex > currentIndex
   const index = advanceQuest(npc.id, targetIndex)
@@ -157,7 +181,8 @@ function resolvePlan(
 
   return {
     plan: { stepId: step.id, stepLabel: step.label, index, total: steps.length },
-    advanced: advanced || Boolean(reason),
+    advanced,
+    blockedBy: blockedBy ?? reason === null ? null : blockedBy,
   }
 }
 
@@ -239,7 +264,7 @@ export async function* handleChatStream(input: {
   const correction = meta.correction
 
   // ── 任务计划 ──
-  const { plan, advanced } = resolvePlan(npc, meta.planStep, meta.planReason)
+  const { plan, advanced, blockedBy } = resolvePlan(npc, meta.planStep, meta.planReason, input.message)
 
   // ── 工具：模型申请 + 学习闭环兜底 ──
   const calls: ToolCall[] = [...meta.tools]
@@ -356,7 +381,11 @@ export async function* handleChatStream(input: {
     {
       turn,
       agent: "plan",
-      action: `任务推进到 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}${advanced ? "（前进）" : ""}`,
+      action: advanced
+        ? `任务推进到 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}（前进）`
+        : blockedBy
+          ? `停在 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}（完成「${blockedBy}」的证据不足）`
+          : `停在 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}`,
       detail: meta.planReason ?? undefined,
     },
     ...(probePlan

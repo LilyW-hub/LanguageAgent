@@ -179,8 +179,12 @@ export interface Npc {
     title: string
     brief: string
     goals: string[]
-    /** 任务状态机的步骤（顺序推进） */
-    steps: Array<{ id: string; label: string }>
+    /**
+     * 任务状态机的步骤（顺序推进）。
+     * 推进一步需要「证据」：用户这句话命中 cues，或达到 minWords。
+     * 没有 cues 也没有 minWords 的步骤（如打招呼）视为自动满足。
+     */
+    steps: Array<{ id: string; label: string; cues?: string[]; minWords?: number }>
     reward: string
     /** 需要几次有效纠错才算完成 */
     target: number

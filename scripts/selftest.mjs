@@ -323,8 +323,40 @@ async function main() {
     `HTTP ${pron.status}`,
   )
 
-  // ── 8. 收尾 ────────────────────────────────────
-  section("8. 收尾")
+  // ── 8. 任务推进需要内容证据 ─────────────────────
+  section("8. 任务推进的准入")
+  await post("/api/reset")
+  await onboard()
+
+  const idle1 = await chat("I love music very much.")
+  const idle2 = await chat("The weather is nice today.")
+  record(
+    "无关闲聊不推进任务",
+    (idle1.body.plan?.index ?? -1) === 0 && (idle2.body.plan?.index ?? -1) === 0,
+    `${idle1.body.plan?.index} → ${idle2.body.plan?.index}`,
+  )
+
+  const ordered = await chat("Can I have a flat white please?")
+  record(
+    "内容匹配才推进",
+    (ordered.body.plan?.index ?? 0) === 1,
+    `${ordered.body.plan?.index} / ${ordered.body.plan?.stepLabel}`,
+  )
+
+  const confirmed = await chat("Yes please, thanks a lot.")
+  record(
+    "确认后才到第三步",
+    (confirmed.body.plan?.index ?? 0) === 2,
+    `${confirmed.body.plan?.index} / ${confirmed.body.plan?.stepLabel}`,
+  )
+  record(
+    "任务不会因闲聊聊满而完成",
+    (confirmed.body.plan?.index ?? 0) < (confirmed.body.plan?.total ?? 4) - 1,
+    `当前 ${confirmed.body.plan?.index}/${(confirmed.body.plan?.total ?? 4) - 1}`,
+  )
+
+  // ── 9. 收尾 ────────────────────────────────────
+  section("9. 收尾")
   const finalReset = await post("/api/reset")
   record("重置回干净状态", finalReset.status === 200)
 
