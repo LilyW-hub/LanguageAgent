@@ -29,7 +29,8 @@ npm run dev     # http://localhost:3000
 2. 进入 **伦敦 · 咖啡馆**，Maya 打招呼。顶部可见 `📍 伦敦 · 咖啡馆` 与 `🎯 点单 + 过去时`。
 3. 点 **😈 演示错误句** 按钮 → 发送
    `Yesterday I go to a nice cafe and I meet a friend.`
-   → Maya 在对话里自然用 `went / met` 纠正（不打断），气泡下方出现 **课后卡** 与 **📜 档案卡**。
+   → Maya 在对话里自然用 `went / met` 复述（不打断），气泡下方出现可折叠的 **「💬 也可以这样说」**；
+     任务推进到第 2 步时自动收录 **📜 档案**。
 4. 看右栏 **画像** Tab：出现 `Inferred: likes photography (0.8)` 等推测条目。
 5. 切到 **Agent Trace** Tab：看到 `🧠 memory → 🩺 tutor → 🎭 npc → 👤 profile` 完整编排。
 6. 左栏切到 **Leo（摄影师）**：他不「认出」你，但话题/难度已经跟着画像走 —— 这就是「记忆跟随 + diegetic 连续性」。
@@ -88,11 +89,11 @@ Agent 感由右侧 **Trace 面板**实时呈现。
 
 ```bash
 npm run dev          # 另开终端
-npm run selftest     # 34 项检查，约 60-120 秒
+npm run selftest     # 50 项检查，约 90-150 秒
 ```
 
-覆盖：连通性 / Onboarding / 纠错（含不误报）/ 记忆跟随与 diegetic 约束 /
-SSE 流式时序 / 回放模式 / 语音接口降级 / 状态重置。
+覆盖：连通性 / Onboarding / 纠错（含不误报与严重度）/ 记忆跟随与 diegetic 约束 /
+SSE 流式时序 / 回放模式 / 语音接口降级 / 任务准入 / 状态重置。
 改完代码先跑一遍，比手点浏览器快。
 
 ---
@@ -117,6 +118,46 @@ curl -X POST localhost:3000/api/mode -d '{"replay":false}' -H 'Content-Type: app
 - **场景背景**：`public/scenes/coffee.svg`、`street.svg`（矢量、离线可用、体积 KB 级）
 - **NPC 头像**：把图片放到 `public/avatars/<id>.png`（如 `maya.png` / `leo.png`）即自动生效；
   没有图片时回退到 emoji 徽章，不会出现破图。
+
+---
+
+## 纠错分级：只说会误解的
+
+`Correction.severity` 分三级：
+
+| 级别 | 处理 |
+|---|---|
+| `blocking` | 会让对方误解意思（时态导致时间混乱、动词形式错、词义用反）→ NPC 当面自然复述一次 |
+| `minor` | 不影响理解的小瑕疵（冠词、单复数）→ **不当面纠**，只放进折叠卡 |
+| `none` | 无错误 |
+
+模型没给 severity 时，服务端兜底为 `blocking`——宁可不纠，也不要漏掉影响意思的错误。
+
+---
+
+## 薄弱点回收：换个角度再问一次
+
+- 人设卡里每个角色有 4 个 `probeSlots`（对话**意图**，不是句子模板）
+- `lib/review.ts` 挑一个未 resolved、且至少隔了一轮的弱点，配一个**没用过的角度**
+- 提示词要求：不点破、换问法、话题不合适就别硬转
+- 模型在 META 里回报 `probe{triggered, usedCorrectly}`
+- 用对了 → `hits+1`、状态升级、**+15 XP**；又错了 → `misses+1`，仍停在「回收中」
+- 画像面板显示弱点生命周期：**新发现 / 回收中 / 已掌握**
+
+---
+
+## 任务推进的准入
+
+每一步都有完成条件，**聊几句不会自动通关**：
+
+| 步骤 | 准入条件 |
+|---|---|
+| 打招呼 | 命中 `hi / hello / hey…` |
+| 点单 | 命中 `coffee / latte / please / can I…` |
+| 确认 | 命中 `yes / thanks / large…` |
+| 闲聊 | 至少 8 个词 |
+
+每轮最多前进一步；证据不足就停在原地，Trace 写「完成「点单」的证据不足」。
 
 ---
 
