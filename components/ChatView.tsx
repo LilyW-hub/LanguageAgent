@@ -60,15 +60,8 @@ export default function ChatView({
     busy && !(lastMessage?.role === "npc" && lastMessage.content.length > 0)
 
   return (
-    <section className="flex-1 min-w-0 flex flex-col relative">
-      {/* 场景背景：渐变打底 + 场景图叠加，离线可用 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: npc.bg }} />
-      <div
-        className="absolute inset-0 pointer-events-none opacity-25 bg-cover bg-center"
-        style={{ backgroundImage: `url(${npc.sceneImage})` }}
-      />
-
-      <header className="relative px-5 py-3 border-b border-stone-200 bg-white/80 backdrop-blur">
+    <section id="main-content" className="chat-panel" aria-label="英语场景对话">
+      <header className="chat-heading">
         <div className="flex items-center gap-3">
           <NpcAvatar npc={npc} size={38} />
           <button
@@ -87,20 +80,20 @@ export default function ChatView({
               </span>
             </div>
             <div className="text-xs text-stone-500 truncate">
-              📍 {npc.city} · {npc.sceneLabel}
+              {npc.city} · {npc.sceneLabel}
             </div>
           </button>
           <div className="flex items-center gap-2">
             {rewards && (
               <div className="text-[11px] px-2 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-800 tabular-nums">
-                ⭐ {rewards.total} XP · Lv.{rewards.level}
+                {rewards.total} XP · Lv.{rewards.level}
               </div>
             )}
             <div
               className="text-[11px] px-2 py-1 rounded-full border bg-white/70"
               style={{ borderColor: npc.accent, color: npc.accent }}
             >
-              🎯 {npc.learningObjective}
+              {npc.learningObjective}
             </div>
           </div>
         </div>
@@ -114,12 +107,12 @@ export default function ChatView({
         </div>
       )}
 
-      <div className="relative flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <div className="conversation" aria-label="对话记录">
         {messages.map((message) => (
-          <div key={message.id}>
+          <div key={message.id} className="message-row">
             <div className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`message-bubble max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                   message.role === "user"
                     ? "bg-stone-900 text-white rounded-br-sm"
                     : "bg-white text-stone-800 border border-stone-200 rounded-bl-sm shadow-sm"
@@ -154,16 +147,16 @@ export default function ChatView({
           <div className="flex justify-start">
             <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-stone-400 flex items-center gap-2">
               <span className="inline-flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.1s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce" />
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+                <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
               </span>
               <span>
                 {stage === 0
-                  ? "🧠 读取画像…"
+                  ? `${npc.name} 正在听…`
                   : stage === 1
-                    ? "🩺 理解你的表达…"
-                    : `🎭 ${npc.name} 正在回复…`}
+                    ? "正在理解你的表达…"
+                    : `${npc.name} 正在回复…`}
               </span>
             </div>
           </div>
@@ -178,16 +171,16 @@ export default function ChatView({
         <div ref={bottomRef} />
       </div>
 
-      <footer className="relative border-t border-stone-200 bg-white/85 backdrop-blur px-4 py-3">
-        <div className="flex flex-wrap gap-2 mb-2">
+      <footer className="chat-composer">
+        <div className="conversation-starters">
           {npc.suggestions.map((item) => (
             <button
-              key={`${npc.id}-${item.label}`}
+              key={`${npc.id}-${item.label.replace(/^[^a-zA-Z\u4e00-\u9fa5]+/u, "")}`}
               type="button"
               onClick={() => setDraft(item.text)}
               className="text-[11px] px-2.5 py-1 rounded-full border border-stone-200 bg-white text-stone-600 hover:border-stone-400"
             >
-              {item.label}
+              {item.label.replace(/^[^a-zA-Z\u4e00-\u9fa5]+/u, "")}
             </button>
           ))}
         </div>
@@ -215,20 +208,21 @@ export default function ChatView({
               if (voiceMeta) setVoiceMeta(null)
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault()
                 submit()
               }
             }}
-            rows={1}
-            placeholder={`用英语和 ${npc.name} 说话，或点麦克风…（Enter 发送）`}
+            aria-label="英语消息"
+            rows={2}
+            placeholder={`对 ${npc.name} 说点什么…`}
             className="flex-1 resize-none px-3 py-2.5 rounded-xl border border-stone-200 text-sm outline-none focus:border-stone-400 max-h-32"
           />
           <button
             type="button"
             onClick={submit}
             disabled={busy || draft.trim().length === 0}
-            className="px-4 py-2.5 rounded-xl bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 disabled:opacity-40"
+            className="btn send-button px-4 py-2.5 rounded-xl bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 disabled:opacity-40"
           >
             发送
           </button>
