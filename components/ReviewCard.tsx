@@ -1,40 +1,50 @@
 "use client"
 
+import { useState } from "react"
 import type { Correction } from "@/lib/types"
 
+/**
+ * 「也可以这样说」——不是错题判决，是一句补充。
+ *
+ * 设计原则（鼓励优先）：
+ * - 默认折叠，不打断阅读
+ * - 不显示「原句」、不划线、不打错误类型标签
+ * - 中性配色，不用红色
+ * - 用户想看才展开
+ */
 export default function ReviewCard({ correction }: { correction: Correction }) {
+  const [open, setOpen] = useState(false)
+
+  const hasNatural = Boolean(correction.natural && correction.natural !== correction.corrected)
+
   return (
-    <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50/70 p-3 text-sm">
-      <div className="flex items-center gap-2 text-xs font-medium text-rose-700">
-        <span>🩺</span>
-        <span>课后卡 · {correction.errorType}</span>
-      </div>
+    <div className="mt-1.5 rounded-lg border border-stone-200 bg-white/70">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left"
+      >
+        <span className="text-[11px]">💬</span>
+        <span className="text-[11px] text-stone-500">也可以这样说</span>
+        <span className="ml-auto text-[10px] text-stone-400">{open ? "▴" : "▾"}</span>
+      </button>
 
-      <div className="mt-2 space-y-1.5">
-        <div className="flex gap-2">
-          <span className="text-stone-400 shrink-0 text-xs pt-0.5 w-12">原句</span>
-          <span className="text-stone-600 line-through decoration-rose-300">{correction.original}</span>
-        </div>
-        <div className="flex gap-2">
-          <span className="text-stone-400 shrink-0 text-xs pt-0.5 w-12">改后</span>
-          <span className="text-emerald-700 font-medium">{correction.corrected}</span>
-        </div>
-        {correction.natural && correction.natural !== correction.corrected && (
-          <div className="flex gap-2">
-            <span className="text-stone-400 shrink-0 text-xs pt-0.5 w-12">更自然</span>
-            <span className="text-stone-700">{correction.natural}</span>
+      {open && (
+        <div className="px-2.5 pb-2 space-y-1">
+          <div className="text-[13px] text-stone-800 leading-relaxed">
+            {correction.corrected}
           </div>
-        )}
-        {correction.explanation && (
-          <div className="flex gap-2">
-            <span className="text-stone-400 shrink-0 text-xs pt-0.5 w-12">解释</span>
-            <span className="text-stone-600">{correction.explanation}</span>
-          </div>
-        )}
-      </div>
-
-      {correction.addToReview && (
-        <div className="mt-2 text-[11px] text-rose-600">已加入复习列表</div>
+          {hasNatural && (
+            <div className="text-[11px] text-stone-500 leading-relaxed">
+              更自然：{correction.natural}
+            </div>
+          )}
+          {correction.explanation && (
+            <div className="text-[10px] text-stone-400 leading-relaxed">
+              {correction.explanation}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

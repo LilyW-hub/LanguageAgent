@@ -17,6 +17,8 @@ import {
   getQuestStep,
   getReplayMode,
   getXp,
+  dueReviews,
+  rescheduleDueReviews,
   isQuestRewarded,
   markQuestRewarded,
   nextTurn,
@@ -210,6 +212,21 @@ export async function* handleChatStream(input: {
   // ── 工具：模型申请 + 学习闭环兜底 ──
   const calls: ToolCall[] = [...meta.tools]
 
+  // 档案产自「任务推进」，而不是「说错了」：
+  // 步骤推进时以步骤为准，模型同轮的散装档案申请让位，保证每轮最多一张
+  if (advanced) {
+    const existing = calls.findIndex((call) => call.name === "create_archive")
+    if (existing >= 0) calls.splice(existing, 1)
+    calls.push({
+      name: "create_archive",
+      args: {
+        title: `${npc.city === "London" ? "伦敦" : npc.city}·${npc.sceneLabel}·${plan.stepLabel}`,
+        category: "Life",
+        summary: `完成「${plan.stepLabel}」这一步的交流`,
+      },
+    })
+  }
+
   if (correction.errorType !== "none") {
     if (!calls.some((call) => call.name === "schedule_review")) {
       calls.push({
@@ -221,9 +238,7 @@ export async function* handleChatStream(input: {
         },
       })
     }
-    if (!calls.some((call) => call.name === "create_archive")) {
-      calls.push({ name: "create_archive", args: {} })
-    }
+
   }
 
   const results: ToolResult[] = []
@@ -256,13 +271,16 @@ export async function* handleChatStream(input: {
   const rewardItems: string[] = []
   let xpGained = 0
 
-  if (correction.errorType !== "none") {
-    xpGained += 10
-    rewardItems.push("纠错复习 +10")
-  }
-  if (archiveCard) {
-    xpGained += 5
-    rewardItems.push("收录档案 +5")
+  // 开口就给分：奖励「说」这个行为本身，而不是「说错」
+  xpGained += 5
+  rewardItems.push("开口 +5")
+
+  // 巩固：有到期复习项、且本轮没在该点上出错 → 说明用对了
+  const due = dueReviews()
+  if (due.length > 0 && correction.errorType === "none") {
+    const count = rescheduleDueReviews()
+    xpGained += 15
+    rewardItems.push(`巩固 ${count} 个复习点 +15`)
   }
   if (plan.index >= plan.total - 1 && !isQuestRewarded(npc.id)) {
     xpGained += 25

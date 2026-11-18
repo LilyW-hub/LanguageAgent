@@ -181,11 +181,21 @@ async function main() {
   )
 
   record(
-    "奖励真实发放（XP 与明细）",
-    (errTurn.body.rewards?.gained ?? 0) > 0 && (errTurn.body.rewards?.items?.length ?? 0) > 0,
+    "开口即得分（不依赖说错）",
+    (errTurn.body.rewards?.gained ?? 0) >= 5,
     errTurn.body.rewards
-      ? `+${errTurn.body.rewards.gained} (总 ${errTurn.body.rewards.total}) ${errTurn.body.rewards.items.join("、")}`
+      ? `+${errTurn.body.rewards.gained} (${errTurn.body.rewards.items.join("、")})`
       : "无",
+  )
+  record(
+    "纠错本身不额外加分",
+    !(errTurn.body.rewards?.items ?? []).some((item) => item.includes("纠错")),
+    (errTurn.body.rewards?.items ?? []).join("、"),
+  )
+  record(
+    "录音档来自任务推进而非错误",
+    Boolean(errTurn.body.archiveCard) && Boolean(errTurn.body.plan),
+    errTurn.body.archiveCard?.title,
   )
   record(
     "Trace 记录奖励发放",
@@ -195,9 +205,9 @@ async function main() {
   const cleanTurn = await chat("Can I have a flat white please?")
   record("正确句子：不误报", cleanTurn.body.correction === null, cleanTurn.body.correction?.corrected)
   record(
-    "正确句子：不产生档案",
-    cleanTurn.body.archiveCard === null,
-    cleanTurn.body.archiveCard?.title,
+    "正确句子：同样有开口分",
+    (cleanTurn.body.rewards?.gained ?? 0) >= 5,
+    cleanTurn.body.rewards ? `+${cleanTurn.body.rewards.gained}` : "无",
   )
   record(
     "任务步骤单步推进",

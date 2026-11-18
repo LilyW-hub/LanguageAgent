@@ -122,6 +122,19 @@ export function countReviews(): number {
   return store.reviews.length
 }
 
+/** 已到期的复习项 */
+export function dueReviews(now = Date.now()): ReviewItem[] {
+  return store.reviews.filter((item) => new Date(item.dueAt).getTime() <= now)
+}
+
+/** 复习完成：把到期项向后顺延（间隔重复的简化版） */
+export function rescheduleDueReviews(now = Date.now()): number {
+  const due = dueReviews(now)
+  const next = new Date(now + 3 * 86400000).toISOString()
+  for (const item of due) item.dueAt = next
+  return due.length
+}
+
 /** 任务进度只前进不后退 */
 export function advanceQuest(npcId: string, stepIndex: number): number {
   const current = store.questStep[npcId] ?? 0
