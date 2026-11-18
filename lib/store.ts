@@ -1,3 +1,7 @@
+import { isTaskCompletionArchive } from "./archiveContent"
+import { randomUUID } from "node:crypto"
+import { readData, writeData } from "./localData"
+import { getGrowth, recordGrowth, resetGrowth } from "./growth"
 import type {
   ArchiveCard,
   Correction,
@@ -33,8 +37,7 @@ interface StoreState {
   probes: ProbeRecord[]
   /** 每个薄弱点的生命周期 */
   weaknessStatus: Record<string, WeaknessState>
-  /** 回放模式：不调用模型，走 lib/demoScript.ts 的剧本（现场兜底） */
-  replay: boolean
+
 }
 
 function createStore(): StoreState {
@@ -42,7 +45,7 @@ function createStore(): StoreState {
     profile: null,
     history: {},
     corrections: [],
-    archives: [],
+    archives: readData<ArchiveCard[]>("archives", []),
     trace: [],
     turn: 0,
     reviews: [],
@@ -51,7 +54,6 @@ function createStore(): StoreState {
     questRewarded: {},
     probes: [],
     weaknessStatus: {},
-    replay: false,
   }
 }
 
@@ -69,18 +71,12 @@ export function setProfile(profile: Profile): void {
   store.profile = profile
 }
 
-export function getReplayMode(): boolean {
-  return store.replay
-}
-
-export function setReplayMode(value: boolean): void {
-  store.replay = value
-}
-
 export function resetStore(): void {
+  resetGrowth()
   store.profile = null
   store.history = {}
   store.corrections = []
+  writeData("archives", [])
   store.archives = []
   store.trace = []
   store.turn = 0
@@ -116,15 +112,24 @@ export function addCorrection(correction: Correction): void {
 }
 
 export function addArchive(card: ArchiveCard): void {
-  store.archives.push(card)
+  if (isTaskCompletionArchive(card)) return
+  const next = [...store.archives, card]
+  writeData("archives", next)
+  store.archives = next
 }
 
 export function getArchives(): ArchiveCard[] {
+  const knowledge = store.archives.filter(card => !isTaskCompletionArchive(card))
+  if (knowledge.length !== store.archives.length || knowledge.some(card => !card.id)) {
+    const next = knowledge.map(card => ({ ...card, id: card.id ?? randomUUID() }))
+    writeData("archives", next)
+    store.archives = next
+  }
   return store.archives
 }
 
 export function countArchives(): number {
-  return store.archives.length
+  return getArchives().length
 }
 
 export function addReview(item: ReviewItem): void {
@@ -154,14 +159,15 @@ export function rescheduleDueReviews(now = Date.now()): number {
 
 /** 任务进度只前进不后退 */
 export function advanceQuest(npcId: string, stepIndex: number): number {
-  const current = store.questStep[npcId] ?? 0
+  const current = getQuestStep(npcId)
   const next = Math.max(current, stepIndex)
+  recordGrowth(npcId, next)
   store.questStep[npcId] = next
   return next
 }
 
 export function getQuestStep(npcId: string): number {
-  return store.questStep[npcId] ?? 0
+  return store.questStep[npcId] ?? getGrowth().find(item => item.npcId === npcId)?.index ?? 0
 }
 
 export function addXp(amount: number): number {

@@ -1,10 +1,11 @@
+import { archiveContext } from "./archiveLearning"
+import { getGrowth } from "./growth"
 import { runMergedStream } from "./agents/mergedStream"
 import { runProfileExtractor } from "./agents/profileExtractor"
 import { sameExceptPunctuation, toCorrection } from "./agents/tutor"
 import { buildMemorySummary } from "./agents/memory"
 import { extractJson } from "./llm"
-import { fallbackReply, findScriptedTurn } from "./demoScript"
-import { getNpc } from "./npcs"
+import { getNpc } from "./npcRegistry"
 import { executeTool, sanitizeToolCalls, type ToolCall, type ToolResult } from "./tools"
 import { planProbe, weaknessOverview } from "./review"
 import {
@@ -16,7 +17,6 @@ import {
   getHistory,
   getProfile,
   getQuestStep,
-  getReplayMode,
   getXp,
   recordProbe,
   isQuestRewarded,
@@ -198,18 +198,13 @@ export async function* handleChatStream(input: {
   if (!profile) throw new Error("PROFILE_MISSING")
 
   const npc = getNpc(input.npcId)
-  const replay = getReplayMode()
   const turn = nextTurn()
 
   const memory = buildMemorySummary(profile, npc)
   yield { event: "stage", data: { stage: "memory" } }
 
-  const extractorPromise = replay
-    ? Promise.resolve({ delta: null as ProfileDelta | null, error: null as string | null })
-    : runProfileExtractor({ userMessage: input.message, turn })
-
-  // 本轮要不要回收某个薄弱点（回放模式不回收）
-  const probePlan = replay ? null : planProbe(npc, turn)
+  const extractorPromise = runProfileExtractor({ userMessage: input.message, turn })
+  const probePlan = planProbe(npc, turn)
 
   yield { event: "stage", data: { stage: "tutor" } }
 
@@ -223,16 +218,7 @@ export async function* handleChatStream(input: {
     probe: null,
   }
 
-  if (replay) {
-    const scripted = findScriptedTurn(npc.id, input.message)
-    reply = scripted?.reply ?? fallbackReply(npc.id)
-    meta.correction = scripted?.correction ?? NO_CORRECTION(input.message)
-    // 回放模式按轮次推进任务步骤
-    const steps = npc.quest.steps
-    meta.planStep = steps[Math.min(turn - 1, steps.length - 1)]!.id
-    yield { event: "stage", data: { stage: "npc" } }
-    yield { event: "delta", data: { text: reply } }
-  } else {
+  {
     let metaRaw = ""
     let npcStageSent = false
 
@@ -240,6 +226,7 @@ export async function* handleChatStream(input: {
       npc,
       profile,
       memorySummary: memory.summary,
+      archiveContext: archiveContext(npc, input.message, turn),
       history: getHistory(npc.id),
       userMessage: input.message,
       correction: null,
@@ -269,21 +256,7 @@ export async function* handleChatStream(input: {
   // ── 工具：模型申请 + 学习闭环兜底 ──
   const calls: ToolCall[] = [...meta.tools]
 
-  // 档案产自「任务推进」，而不是「说错了」：
-  // 步骤推进时以步骤为准，模型同轮的散装档案申请让位，保证每轮最多一张
-  if (advanced) {
-    const existing = calls.findIndex((call) => call.name === "create_archive")
-    if (existing >= 0) calls.splice(existing, 1)
-    calls.push({
-      name: "create_archive",
-      args: {
-        title: `${npc.city === "London" ? "伦敦" : npc.city}·${npc.sceneLabel}·${plan.stepLabel}`,
-        category: "Life",
-        summary: `完成「${plan.stepLabel}」这一步的交流`,
-      },
-    })
-  }
-
+  // 任务推进仅写入成长记录；档案保留模型提炼的实际知识。
   if (correction.errorType !== "none") {
     if (!calls.some((call) => call.name === "schedule_review")) {
       calls.push({
@@ -309,18 +282,7 @@ export async function* handleChatStream(input: {
 
   // ── 画像 ──
   const extractorResult = await extractorPromise
-  const profileDelta = replay
-    ? (() => {
-        const scripted = findScriptedTurn(npc.id, input.message)
-        if (!scripted?.inferred && !scripted?.weaknesses) return null
-        return {
-          ...(scripted.inferred
-            ? { inferred: scripted.inferred.map((item) => ({ ...item, sourceTurn: turn })) }
-            : {}),
-          ...(scripted.weaknesses ? { weaknesses: scripted.weaknesses } : {}),
-        }
-      })()
-    : extractorResult.delta
+  const profileDelta = extractorResult.delta
 
   applyProfileDelta(profileDelta)
 
@@ -464,6 +426,7 @@ export async function* handleChatStream(input: {
     event: "done",
     data: {
       reply,
+      growth: getGrowth(),
       plan,
       rewards,
       learningObjective: npc.learningObjective,

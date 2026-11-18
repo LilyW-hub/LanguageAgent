@@ -38,3 +38,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project-local Node runtime and npm cache
+/.runtime/
+
+# local task growth records
+/.data/

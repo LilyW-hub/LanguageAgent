@@ -103,13 +103,14 @@ export function llm(): OpenAI {
 export async function chatText(
   system: string,
   user: string,
-  options: { maxTokens?: number; temperature?: number } = {},
+  options: { maxTokens?: number; temperature?: number; jsonObject?: boolean } = {},
 ): Promise<string> {
   try {
     const res = await withRetry(() =>
       llm().chat.completions.create(
         {
           model: MODEL,
+          ...(options.jsonObject ? { response_format: { type: "json_object" as const } } : {}),
           messages: [
             { role: "system", content: system },
             { role: "user", content: user },
@@ -128,6 +129,7 @@ export async function chatText(
       const retry = await llm().chat.completions.create(
         {
           model: MODEL,
+          ...(options.jsonObject ? { response_format: { type: "json_object" as const } } : {}),
           messages: [
             { role: "system", content: system },
             { role: "user", content: user },

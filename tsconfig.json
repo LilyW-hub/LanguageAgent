@@ -35,6 +35,7 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
+    ".runtime",
     "node_modules"
   ]
 }

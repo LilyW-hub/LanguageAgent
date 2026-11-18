@@ -1,5 +1,6 @@
 "use client"
 
+import ArchivePractice from "./ArchivePractice"
 import type { ArchiveCard } from "@/lib/types"
 
 export interface ArchiveEntry {
@@ -22,9 +23,9 @@ export default function ArchivePanel({ entries }: { entries: ArchiveEntry[] }) {
   if (entries.length === 0) {
     return (
       <div className="p-4 text-xs text-stone-400 leading-relaxed">
-        还没有档案。和当地人聊出一次「被纠正的表达」，就会自动收录一张。
+        还没有档案。和当地人交流、学习新的表达和生活知识，就会自动收录。
         <div className="mt-3 text-[10px] text-stone-300">
-          提示：用「😈 演示错误句」最快看到一张。
+          收集后可以针对档案知识点进行练习。
         </div>
       </div>
     )
@@ -72,6 +73,7 @@ export default function ArchivePanel({ entries }: { entries: ArchiveEntry[] }) {
                   {entry.card.summary}
                 </div>
                 <div className="mt-0.5 text-[9px] text-amber-700">来自 {entry.npcName}</div>
+                {entry.card.id && <ArchivePractice archiveId={entry.card.id} />}
               </li>
             ))}
           </ul>

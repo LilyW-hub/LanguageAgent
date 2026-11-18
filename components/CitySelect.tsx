@@ -9,11 +9,15 @@ export default function CitySelect({
   onSelect,
   archivesCount,
   onBack,
+  onGenerate, generating, generateError,
 }: {
   npcs: Npc[]
   activeId: string
   onSelect: (id: string) => void
   archivesCount: number
+  onGenerate: () => void
+  generating: boolean
+  generateError: string | null
   onBack: () => void
 }) {
   return (
@@ -39,6 +43,8 @@ export default function CitySelect({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        <button onClick={onGenerate} disabled={generating} className="w-full rounded-xl border border-dashed border-emerald-400 p-3 text-xs text-emerald-800 disabled:opacity-50">{generating ? "正在创造新角色…" : "＋ 探索新角色"}</button>
+        {generateError && <p role="alert" className="text-xs text-rose-600">{generateError}</p>}
         {npcs.map((npc) => {
           const active = npc.id === activeId
           return (

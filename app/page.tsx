@@ -7,9 +7,12 @@ import WorldMap from "@/components/WorldMap"
 import CitySelect from "@/components/CitySelect"
 import Onboarding from "@/components/Onboarding"
 import ProfilePanel from "@/components/ProfilePanel"
-import TracePanel from "@/components/TracePanel"
+import GrowthPanel from "@/components/GrowthPanel"
 import { DEFAULT_NPC_ID, getNpc, listNpcs } from "@/lib/npcs"
 import type {
+  Npc,
+  ArchiveCard,
+  GrowthRecord,
   ChatMessage,
   ChatResponse,
   Level,
@@ -17,7 +20,6 @@ import type {
   PronunciationFeedback,
   QuestPlan,
   RewardSummary,
-  TraceStep,
 } from "@/lib/types"
 
 /** 解析一个 SSE 事件块（"event: x\ndata: {...}"） */
@@ -45,16 +47,19 @@ function nextId(prefix: string): string {
 }
 
 export default function Home() {
+  const [npcs, setNpcs] = useState<Npc[]>(listNpcs)
+  const [archiveCards, setArchiveCards] = useState<ArchiveCard[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [growth, setGrowth] = useState<GrowthRecord[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [ready, setReady] = useState(false)
   const [npcId, setNpcId] = useState(DEFAULT_NPC_ID)
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({})
-  const [trace, setTrace] = useState<TraceStep[]>([])
-  const [tab, setTab] = useState<"profile" | "trace" | "archive">("profile")
+  const [tab, setTab] = useState<"profile" | "growth" | "archive">("profile")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
-  const [replay, setReplay] = useState(false)
   const [stage, setStage] = useState(0)
   const [view, setView] = useState<"map" | "city">("map")
   const [toast, setToast] = useState<string | null>(null)
@@ -73,14 +78,14 @@ export default function Home() {
         }
         const where = data.config ? `${data.config.baseURL} · ${data.config.model}` : ""
         setHealthError(
-          `${data.error ?? "模型不可用"}${where ? `（${where}）` : ""}　—　可点右上角「回放」继续演示`,
+          `${data.error ?? "模型不可用"}${where ? `（${where}）` : ""}`,
         )
       })
       .catch(() => setHealthError("无法访问 /api/health，请确认 dev 服务在运行"))
   }, [])
 
-  const seedOpening = useCallback((id: string) => {
-    const npc = getNpc(id)
+  const seedOpening = useCallback((id: string, character?: Npc) => {
+    const npc = character ?? getNpc(id)
     setMessages((prev) => {
       if (prev[id] && prev[id]!.length > 0) return prev
       return {
@@ -95,9 +100,11 @@ export default function Home() {
     let cancelled = false
     fetch("/api/onboard")
       .then((res) => res.json())
-      .then((data: { profile: Profile | null; replay?: boolean }) => {
+      .then((data: { profile: Profile | null; growth?: GrowthRecord[]; npcs?: Npc[]; archives?: ArchiveCard[] }) => {
         if (cancelled) return
-        if (typeof data.replay === "boolean") setReplay(data.replay)
+        setNpcs(data.npcs ?? listNpcs())
+        setArchiveCards(data.archives ?? [])
+        setGrowth(data.growth ?? [])
         if (data.profile) {
           setProfile(data.profile)
           seedOpening(DEFAULT_NPC_ID)
@@ -129,10 +136,12 @@ export default function Home() {
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error(`初始化失败（${res.status}）`)
-      const payload = (await res.json()) as { profile: Profile }
+      const payload = (await res.json()) as { profile: Profile; growth: GrowthRecord[]; npcs: Npc[]; archives: ArchiveCard[] }
+      setNpcs(payload.npcs)
+      setArchiveCards(payload.archives)
+      setGrowth(payload.growth)
       setProfile(payload.profile)
       setMessages({})
-      setTrace([])
       setPlans({})
       setRewards({})
       setWeaknesses([])
@@ -146,7 +155,7 @@ export default function Home() {
 
   function handleSelectNpc(id: string) {
     setNpcId(id)
-    seedOpening(id)
+    seedOpening(id, npcs.find(npc => npc.id === id))
   }
 
   async function handleSend(text: string, pronunciation?: PronunciationFeedback | null) {
@@ -227,8 +236,12 @@ export default function Home() {
                 correction: payload.correction,
                 archiveCard: payload.archiveCard,
               })
+              if (payload.archiveCard) {
+                const card = payload.archiveCard
+                setArchiveCards(prev => card.id && prev.some(item => item.id === card.id) ? prev : [...prev, card])
+              }
+              setGrowth(payload.growth)
               setProfile(payload.profile)
-              setTrace((prev) => [...prev, ...payload.trace])
               if (payload.plan) {
                 setPlans((prev) => ({ ...prev, [targetNpc]: payload.plan as QuestPlan }))
               }
@@ -236,7 +249,6 @@ export default function Home() {
                 setRewards((prev) => ({ ...prev, [targetNpc]: payload.rewards }))
               }
               if (payload.weaknesses) setWeaknesses(payload.weaknesses)
-              if (payload.correction) setTab("trace")
               if (payload.rewards && payload.rewards.gained > 0) {
                 const bits = [
                   payload.archiveCard ? `📜 ${payload.archiveCard.title}` : "",
@@ -270,31 +282,29 @@ export default function Home() {
     }
   }
 
-  async function toggleReplay() {
-    const next = !replay
-    setBusy(true)
+  async function handleGenerateNpc() {
+    if (generating) return
+    setGenerating(true)
+    setGenerateError(null)
     try {
-      const res = await fetch("/api/mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ replay: next }),
-      })
-      const data = (await res.json()) as { replay?: boolean; error?: string }
-      if (!res.ok) throw new Error(data.error ?? `切换失败（${res.status}）`)
-      setReplay(Boolean(data.replay))
-      setError(null)
+      const res = await fetch("/api/npcs", { method: "POST" })
+      const data = await res.json() as { npc?: Npc; error?: string }
+      if (!res.ok || !data.npc) throw new Error(data.error ?? "角色生成失败")
+      const character = data.npc
+      setNpcs(prev => [...prev, character])
+      setNpcId(character.id)
+      seedOpening(character.id, character)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setBusy(false)
-    }
+      setGenerateError(cause instanceof Error ? cause.message : String(cause))
+    } finally { setGenerating(false) }
   }
 
   async function handleReset() {
     await fetch("/api/reset", { method: "POST" }).catch(() => undefined)
+    setArchiveCards([])
+    setGrowth([])
     setProfile(null)
     setMessages({})
-    setTrace([])
     setPlans({})
     setRewards({})
     setWeaknesses([])
@@ -327,11 +337,9 @@ export default function Home() {
     )
   }
 
-  const archiveEntries: ArchiveEntry[] = Object.entries(messages).flatMap(([id, list]) =>
-    list
-      .filter((message) => message.archiveCard)
-      .map((message) => ({ card: message.archiveCard!, npcName: getNpc(id).name })),
-  )
+  const archiveEntries: ArchiveEntry[] = archiveCards.map(card => ({
+    card, npcName: npcs.find(npc => npc.id === card.npcId)?.name ?? "当地人",
+  }))
 
   const archives = archiveEntries
 
@@ -349,14 +357,17 @@ export default function Home() {
     )
   }
 
-  const npc = getNpc(npcId)
+  const npc = npcs.find(item => item.id === npcId) ?? npcs[0]!
 
   return (
     <>
       {healthBanner}
       <div className="h-screen flex overflow-hidden">
       <CitySelect
-        npcs={listNpcs()}
+        npcs={npcs}
+        generating={generating}
+        generateError={generateError}
+        onGenerate={handleGenerateNpc}
         activeId={npcId}
         onSelect={handleSelectNpc}
         archivesCount={archives.length}
@@ -406,27 +417,14 @@ export default function Home() {
           </button>
           <button
             type="button"
-            onClick={() => setTab("trace")}
+            onClick={() => setTab("growth")}
             className={`px-3 py-2 text-xs rounded-t-lg ${
-              tab === "trace"
+              tab === "growth"
                 ? "bg-stone-100 text-stone-900 font-medium"
                 : "text-stone-500 hover:text-stone-800"
             }`}
           >
-            Agent Trace
-          </button>
-          <button
-            type="button"
-            onClick={toggleReplay}
-            disabled={busy}
-            className={`ml-auto mb-1 text-[11px] px-2 py-1 rounded border transition ${
-              replay
-                ? "border-amber-400 bg-amber-100 text-amber-800"
-                : "border-stone-200 text-stone-500 hover:border-stone-400"
-            }`}
-            title="回放模式：不调用模型，按剧本演示（现场兜底）"
-          >
-            {replay ? "▶ 回放中" : "回放"}
+            成长
           </button>
           <button
             type="button"
@@ -444,7 +442,7 @@ export default function Home() {
           ) : tab === "archive" ? (
             <ArchivePanel entries={archiveEntries} />
           ) : (
-            <TracePanel trace={trace} />
+            <GrowthPanel records={growth} npcs={npcs} />
           )}
         </div>
 

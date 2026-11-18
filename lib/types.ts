@@ -48,6 +48,8 @@ export interface Correction {
 }
 
 export interface ArchiveCard {
+  id?: string
+  npcId?: string
   title: string
   city: string
   category: "Language" | "Culture" | "Life" | "People"
@@ -87,6 +89,12 @@ export interface ChatMessage {
   correction?: Correction | null
   archiveCard?: ArchiveCard | null
   pronunciation?: PronunciationFeedback | null
+}
+
+export interface GrowthRecord {
+  npcId: string
+  index: number
+  completedAt: string | null
 }
 
 /** 任务计划的当前进度 */
@@ -140,6 +148,7 @@ export interface RewardSummary {
 }
 
 export interface ChatResponse {
+  growth: GrowthRecord[]
   reply: string
   plan: QuestPlan | null
   rewards: RewardSummary
