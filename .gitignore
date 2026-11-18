@@ -44,3 +44,6 @@ next-env.d.ts
 
 # local task growth records
 /.data/
+
+# Local visual QA reports and browser profiles
+/.taste-skill/

@@ -56,6 +56,7 @@ export default function Home() {
   const [ready, setReady] = useState(false)
   const [npcId, setNpcId] = useState(DEFAULT_NPC_ID)
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({})
+  const [pane, setPane] = useState<"people" | "notes" | null>(null)
   const [tab, setTab] = useState<"profile" | "growth" | "archive">("profile")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +67,22 @@ export default function Home() {
   const [plans, setPlans] = useState<Record<string, QuestPlan>>({})
   const [rewards, setRewards] = useState<Record<string, RewardSummary>>({})
   const [weaknesses, setWeaknesses] = useState<Array<{ target: string; status: string; hits: number; misses: number }>>([])
+
+  // 面板提供可分享的定位链接，也让刷新后能回到正在使用的工作区。
+  useEffect(() => {
+    const restoreLocation = () => {
+      const destination = window.location.hash.slice(1)
+      if (destination === "practice") setView("city")
+      else if (destination === "archive" || destination === "growth" || destination === "profile") {
+        setView("city")
+        setTab(destination)
+        setPane("notes")
+      } else setView("map")
+    }
+    restoreLocation()
+    window.addEventListener("hashchange", restoreLocation)
+    return () => window.removeEventListener("hashchange", restoreLocation)
+  }, [])
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -154,6 +171,7 @@ export default function Home() {
   }
 
   function handleSelectNpc(id: string) {
+    setPane(null)
     setNpcId(id)
     seedOpening(id, npcs.find(npc => npc.id === id))
   }
@@ -312,6 +330,7 @@ export default function Home() {
     setError(null)
     setTab("profile")
     setView("map")
+    window.location.hash = ""
   }
 
   if (!ready) {
@@ -351,18 +370,28 @@ export default function Home() {
           archives={archives.length}
           xp={Object.values(rewards)[0]?.total ?? 0}
           level={Object.values(rewards)[0]?.level ?? 1}
-          onEnterLondon={() => setView("city")}
+          onEnterLondon={() => { setView("city"); window.location.hash = "practice" }}
         />
       </>
     )
   }
 
   const npc = npcs.find(item => item.id === npcId) ?? npcs[0]!
+  const progress = growth.find(item => item.npcId === npc.id)
+  const activePlan = plans[npcId] ?? (progress ? { index: progress.index, total: npc.quest.steps.length, stepId: npc.quest.steps[progress.index]!.id, stepLabel: npc.quest.steps[progress.index]!.label } : null)
 
   return (
     <>
       {healthBanner}
-      <div className="h-screen flex overflow-hidden">
+      <div className="workspace" data-pane={pane ?? ""}>
+      <header className="workspace-toolbar">
+        <button type="button" onClick={() => { setView("map"); window.location.hash = "" }} className="brand-name">LanguageAgent<span className="brand-dot">.</span></button>
+        <span className="toolbar-context">英语练习 <span>/</span> 伦敦</span>
+        <nav aria-label="工作区面板"><button type="button" aria-expanded={pane === "people"} onClick={() => setPane(pane === "people" ? null : "people")}>当地人</button><button type="button" aria-expanded={pane === "notes"} onClick={() => setPane(pane === "notes" ? null : "notes")}>学习笔记</button></nav>
+      </header>
+      <div className="workspace-body">
+      {pane && <button className="panel-backdrop" aria-label="关闭面板" onClick={() => setPane(null)} />}
+
       <CitySelect
         npcs={npcs}
         generating={generating}
@@ -371,7 +400,7 @@ export default function Home() {
         activeId={npcId}
         onSelect={handleSelectNpc}
         archivesCount={archives.length}
-        onBack={() => setView("map")}
+        onBack={() => { setView("map"); window.location.hash = "" }}
       />
 
       {toast && (
@@ -386,27 +415,28 @@ export default function Home() {
         onSend={handleSend}
         busy={busy}
         stage={stage}
-        plan={plans[npcId] ?? null}
+        plan={activePlan}
         rewards={rewards[npcId] ?? null}
         error={error}
       />
 
-      <aside className="w-80 shrink-0 border-l border-stone-200 bg-white flex flex-col">
-        <div className="flex items-center gap-1 px-2 pt-2 border-b border-stone-200">
+      <aside className="notes-panel">
+        <div className="notes-heading"><h2>学习笔记</h2><button type="button" onClick={() => setPane(null)} className="panel-close" aria-label="关闭学习笔记">✕</button></div>
+        <div className="notes-tabs" role="tablist" aria-label="学习笔记">
           <button
             type="button"
-            onClick={() => setTab("profile")}
+            role="tab" aria-selected={tab === "profile"} onClick={() => setTab("profile")}
             className={`px-3 py-2 text-xs rounded-t-lg ${
               tab === "profile"
                 ? "bg-stone-100 text-stone-900 font-medium"
                 : "text-stone-500 hover:text-stone-800"
             }`}
           >
-            画像
+            了解自己
           </button>
           <button
             type="button"
-            onClick={() => setTab("archive")}
+            role="tab" aria-selected={tab === "archive"} onClick={() => setTab("archive")}
             className={`px-3 py-2 text-xs rounded-t-lg ${
               tab === "archive"
                 ? "bg-stone-100 text-stone-900 font-medium"
@@ -417,7 +447,7 @@ export default function Home() {
           </button>
           <button
             type="button"
-            onClick={() => setTab("growth")}
+            role="tab" aria-selected={tab === "growth"} onClick={() => setTab("growth")}
             className={`px-3 py-2 text-xs rounded-t-lg ${
               tab === "growth"
                 ? "bg-stone-100 text-stone-900 font-medium"
@@ -447,9 +477,10 @@ export default function Home() {
         </div>
 
         <div className="px-4 py-2 border-t border-stone-200 text-[10px] text-stone-400">
-          📜 文明档案员 · demo 版本
+          每一段对话，都有迹可循。
         </div>
       </aside>
+      </div>
       </div>
     </>
   )
