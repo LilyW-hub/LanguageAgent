@@ -1,4 +1,13 @@
-import type { ArchiveCard, Correction, Profile, ProfileDelta, ReviewItem, TraceStep } from "./types"
+import type {
+  ArchiveCard,
+  Correction,
+  ProbeRecord,
+  Profile,
+  ProfileDelta,
+  ReviewItem,
+  TraceStep,
+  WeaknessState,
+} from "./types"
 
 /** 单条对话轮次（短期上下文） */
 export interface ChatTurn {
@@ -20,6 +29,10 @@ interface StoreState {
   xp: number
   /** 已经发过完成奖励的 NPC（避免重复发放） */
   questRewarded: Record<string, boolean>
+  /** 薄弱点回收记录 */
+  probes: ProbeRecord[]
+  /** 每个薄弱点的生命周期 */
+  weaknessStatus: Record<string, WeaknessState>
   /** 回放模式：不调用模型，走 lib/demoScript.ts 的剧本（现场兜底） */
   replay: boolean
 }
@@ -36,6 +49,8 @@ function createStore(): StoreState {
     questStep: {},
     xp: 0,
     questRewarded: {},
+    probes: [],
+    weaknessStatus: {},
     replay: false,
   }
 }
@@ -73,6 +88,8 @@ export function resetStore(): void {
   store.questStep = {}
   store.xp = 0
   store.questRewarded = {}
+  store.probes = []
+  store.weaknessStatus = {}
 }
 
 export function currentTurn(): number {
@@ -190,4 +207,44 @@ export function applyProfileDelta(delta: ProfileDelta | null): void {
     const exists = profile.learning.weaknesses.some((item) => item.trim().toLowerCase() === key)
     if (!exists) profile.learning.weaknesses.push(weakness)
   }
+}
+
+
+// ── 薄弱点回收 ──────────────────────────────
+
+export function getWeaknessState(target: string): WeaknessState {
+  const existing = store.weaknessStatus[target]
+  if (existing) return existing
+  const fresh: WeaknessState = { status: "detected", hits: 0, misses: 0, slotsUsed: [], lastTurn: 0 }
+  store.weaknessStatus[target] = fresh
+  return fresh
+}
+
+export function listWeaknessStates(): Array<{ target: string; state: WeaknessState }> {
+  return Object.entries(store.weaknessStatus).map(([target, state]) => ({ target, state }))
+}
+
+export function recordProbe(record: ProbeRecord): void {
+  store.probes.push(record)
+  const state = getWeaknessState(record.target)
+  state.slotsUsed = [...new Set([...state.slotsUsed, record.slot])]
+  state.lastTurn = record.turn
+
+  if (record.outcome === "hit") {
+    state.hits += 1
+    state.status = state.hits >= 2 ? "resolved" : "probing"
+  } else {
+    state.misses += 1
+    state.status = "probing"
+  }
+}
+
+export function getProbes(): ProbeRecord[] {
+  return store.probes
+}
+
+/** 某个弱点最近一次被回收尝试的轮次（用于「隔一轮再试」） */
+export function lastProbeTurn(target: string): number {
+  const state = store.weaknessStatus[target]
+  return state?.lastTurn ?? 0
 }

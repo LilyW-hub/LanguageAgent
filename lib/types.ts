@@ -29,10 +29,19 @@ export interface Profile {
 
 export type ErrorType = "grammar" | "vocabulary" | "word_order" | "pragmatics" | "none"
 
+/**
+ * 错误严重度：
+ * - blocking：会让人误解意思，值得当面自然地复述一次
+ * - minor：不影响理解的细节（冠词、单复数等），不当面纠，只放进折叠卡
+ * - none：无错误
+ */
+export type ErrorSeverity = "blocking" | "minor" | "none"
+
 export interface Correction {
   original: string
   corrected: string
   errorType: ErrorType
+  severity: ErrorSeverity
   explanation: string
   natural: string
   addToReview: boolean
@@ -45,7 +54,7 @@ export interface ArchiveCard {
   summary: string
 }
 
-export type TraceAgent = "memory" | "plan" | "tutor" | "npc" | "tool" | "reward" | "profile"
+export type TraceAgent = "memory" | "plan" | "probe" | "tutor" | "npc" | "tool" | "reward" | "profile"
 
 export interface TraceStep {
   turn: number
@@ -88,6 +97,24 @@ export interface QuestPlan {
   total: number
 }
 
+/** 一次「薄弱点回收」的尝试记录 */
+export interface ProbeRecord {
+  target: string
+  slot: string
+  turn: number
+  outcome: "hit" | "miss"
+}
+
+/** 薄弱点生命周期 */
+export interface WeaknessState {
+  status: "detected" | "probing" | "resolved"
+  hits: number
+  misses: number
+  /** 已经用过的槽位，避免反复问同一个角度 */
+  slotsUsed: string[]
+  lastTurn: number
+}
+
 /** 间隔重复队列项 */
 export interface ReviewItem {
   item: string
@@ -106,8 +133,10 @@ export interface RewardSummary {
   gained: number
   /** 等级（每 100 XP 一级） */
   level: number
-  /** 本轮奖励明细，例如「复习 +10」「档案 +5」 */
+  /** 本轮奖励明细，例如「开口 +5」「回收成功 +15」 */
   items: string[]
+  /** 本轮是否成功回收了一个薄弱点 */
+  probeResolved?: string | null
 }
 
 export interface ChatResponse {
@@ -120,6 +149,8 @@ export interface ChatResponse {
   archiveCard: ArchiveCard | null
   trace: TraceStep[]
   profile: Profile
+  /** 弱点生命周期总览（给侧栏用） */
+  weaknesses?: Array<{ target: string; status: string; hits: number; misses: number }>
 }
 
 export interface Npc {
@@ -141,6 +172,8 @@ export interface Npc {
   story: string
   /** 该角色场景下的快捷句式（属于人设，不同 NPC 不同） */
   suggestions: Array<{ label: string; text: string }>
+  /** 回收薄弱点时可用的对话角度（意图，不是句子模板） */
+  probeSlots: Array<{ id: string; intent: string }>
   /** 与该场景绑定的今日任务 */
   quest: {
     title: string

@@ -181,6 +181,11 @@ async function main() {
   )
 
   record(
+    "纠错带严重度分级",
+    ["blocking", "minor"].includes(errTurn.body.correction?.severity),
+    errTurn.body.correction?.severity,
+  )
+  record(
     "开口即得分（不依赖说错）",
     (errTurn.body.rewards?.gained ?? 0) >= 5,
     errTurn.body.rewards
@@ -204,6 +209,16 @@ async function main() {
 
   const cleanTurn = await chat("Can I have a flat white please?")
   record("正确句子：不误报", cleanTurn.body.correction === null, cleanTurn.body.correction?.corrected)
+  record(
+    "薄弱点进入生命周期跟踪",
+    (cleanTurn.body.weaknesses ?? []).length > 0,
+    JSON.stringify(cleanTurn.body.weaknesses ?? []),
+  )
+  record(
+    "系统安排了回收",
+    (cleanTurn.body.trace ?? []).some((item) => item.agent === "probe"),
+    (cleanTurn.body.trace ?? []).find((item) => item.agent === "probe")?.action ?? "无",
+  )
   record(
     "正确句子：同样有开口分",
     (cleanTurn.body.rewards?.gained ?? 0) >= 5,

@@ -24,6 +24,12 @@ export const NPCS: Record<string, Npc> = {
       { label: "☕ 点一杯", text: "Can I have a flat white, please?" },
       { label: "💬 聊工作", text: "Do you like working in a coffee shop?" },
     ],
+    probeSlots: [
+      { id: "recent_activity", intent: "问对方最近做了什么" },
+      { id: "last_visit", intent: "问对方上一次来这家店是什么时候" },
+      { id: "childhood", intent: "聊到自己的童年，顺口问对方小时候" },
+      { id: "yesterday_routine", intent: "问对方昨天过得怎么样" },
+    ],
     quest: {
       title: "在咖啡馆点一杯",
       brief: "用过去时跟她聊一件昨天的事，顺便点一杯咖啡。说错也没关系——她不会告诉你「你错了」。",
@@ -63,6 +69,12 @@ export const NPCS: Record<string, Npc> = {
       { label: "😈 演示错误句", text: "Yesterday I go to a gallery and I see a great photo." },
       { label: "📷 谈兴趣", text: "I like taking photos of old buildings." },
       { label: "🎨 表达观点", text: "I think street photography is more interesting than studio work." },
+    ],
+    probeSlots: [
+      { id: "last_shoot", intent: "问对方上一次拍照是什么时候" },
+      { id: "first_camera", intent: "聊到自己第一次拿起相机，问对方" },
+      { id: "travel_story", intent: "讲到一次拍摄旅行，问对方去过哪" },
+      { id: "old_vs_new", intent: "对比老建筑和新建筑，问对方更喜欢哪个" },
     ],
     quest: {
       title: "聊一次你拍过的东西",

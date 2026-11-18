@@ -6,6 +6,7 @@ import { extractJson } from "./llm"
 import { fallbackReply, findScriptedTurn } from "./demoScript"
 import { getNpc } from "./npcs"
 import { executeTool, sanitizeToolCalls, type ToolCall, type ToolResult } from "./tools"
+import { planProbe, weaknessOverview } from "./review"
 import {
   addCorrection,
   addTrace,
@@ -17,8 +18,7 @@ import {
   getQuestStep,
   getReplayMode,
   getXp,
-  dueReviews,
-  rescheduleDueReviews,
+  recordProbe,
   isQuestRewarded,
   markQuestRewarded,
   nextTurn,
@@ -46,6 +46,7 @@ const NO_CORRECTION = (text: string): Correction => ({
   original: text,
   corrected: text,
   errorType: "none",
+  severity: "none",
   explanation: "",
   natural: text,
   addToReview: false,
@@ -57,6 +58,7 @@ interface MetaBundle {
   planStep: string | null
   planReason: string | null
   tools: ToolCall[]
+  probe: { target: string | null; slot: string | null; triggered: boolean; usedCorrectly: boolean } | null
 }
 
 /** 解析合并调用的 META：纠错 + 复习焦点 + 任务计划 + 工具申请 */
@@ -67,7 +69,14 @@ function parseMeta(raw: string, userMessage: string): MetaBundle {
 
   const parsed = extractJson(raw)
   if (!parsed || typeof parsed !== "object") {
-    return { correction: NO_CORRECTION(userMessage), focus: null, planStep: null, planReason: null, tools: [] }
+    return {
+      correction: NO_CORRECTION(userMessage),
+      focus: null,
+      planStep: null,
+      planReason: null,
+      tools: [],
+      probe: null,
+    }
   }
 
   const record = parsed as Record<string, unknown>
@@ -101,12 +110,30 @@ function parseMeta(raw: string, userMessage: string): MetaBundle {
       ? { ...correction, errorType: "grammar" as const, addToReview: true }
       : correction
 
+  const rawProbe = record.probe
+  const probe =
+    typeof rawProbe === "object" && rawProbe !== null
+      ? {
+          target:
+            typeof (rawProbe as Record<string, unknown>).target === "string"
+              ? String((rawProbe as Record<string, unknown>).target)
+              : null,
+          slot:
+            typeof (rawProbe as Record<string, unknown>).slot === "string"
+              ? String((rawProbe as Record<string, unknown>).slot)
+              : null,
+          triggered: (rawProbe as Record<string, unknown>).triggered === true,
+          usedCorrectly: (rawProbe as Record<string, unknown>).usedCorrectly === true,
+        }
+      : null
+
   return {
     correction: sameExceptPunctuation(correction.corrected, userMessage) ? NO_CORRECTION(userMessage) : finalCorrection,
     focus,
     planStep,
     planReason,
     tools: sanitizeToolCalls(record.tools),
+    probe,
   }
 }
 
@@ -156,6 +183,9 @@ export async function* handleChatStream(input: {
     ? Promise.resolve({ delta: null as ProfileDelta | null, error: null as string | null })
     : runProfileExtractor({ userMessage: input.message, turn })
 
+  // 本轮要不要回收某个薄弱点（回放模式不回收）
+  const probePlan = replay ? null : planProbe(npc, turn)
+
   yield { event: "stage", data: { stage: "tutor" } }
 
   let reply = ""
@@ -165,6 +195,7 @@ export async function* handleChatStream(input: {
     planStep: null,
     planReason: null,
     tools: [],
+    probe: null,
   }
 
   if (replay) {
@@ -187,6 +218,7 @@ export async function* handleChatStream(input: {
       history: getHistory(npc.id),
       userMessage: input.message,
       correction: null,
+      probe: probePlan,
     })) {
       if (item.type === "delta") {
         if (!npcStageSent) {
@@ -275,12 +307,24 @@ export async function* handleChatStream(input: {
   xpGained += 5
   rewardItems.push("开口 +5")
 
-  // 巩固：有到期复习项、且本轮没在该点上出错 → 说明用对了
-  const due = dueReviews()
-  if (due.length > 0 && correction.errorType === "none") {
-    const count = rescheduleDueReviews()
-    xpGained += 15
-    rewardItems.push(`巩固 ${count} 个复习点 +15`)
+  // 回收薄弱点：真的引出、且这次用对了，才发奖励
+  let probeOutcome: "hit" | "miss" | null = null
+  let probeResolved: string | null = null
+
+  if (probePlan && meta.probe?.triggered) {
+    probeOutcome = meta.probe.usedCorrectly ? "hit" : "miss"
+    recordProbe({
+      target: probePlan.target,
+      slot: probePlan.slotId,
+      turn,
+      outcome: probeOutcome,
+    })
+
+    if (probeOutcome === "hit") {
+      xpGained += 15
+      probeResolved = probePlan.target
+      rewardItems.push(`回收「${probePlan.target}」+15`)
+    }
   }
   if (plan.index >= plan.total - 1 && !isQuestRewarded(npc.id)) {
     xpGained += 25
@@ -295,6 +339,7 @@ export async function* handleChatStream(input: {
     gained: xpGained,
     level: Math.floor(xpTotal / 100) + 1,
     items: rewardItems,
+    probeResolved,
   }
 
   // ── Trace ──
@@ -314,6 +359,21 @@ export async function* handleChatStream(input: {
       action: `任务推进到 ${plan.index + 1}/${plan.total} · ${plan.stepLabel}${advanced ? "（前进）" : ""}`,
       detail: meta.planReason ?? undefined,
     },
+    ...(probePlan
+      ? [
+          {
+            turn,
+            agent: "probe" as const,
+            action:
+              probeOutcome === "hit"
+                ? `回收「${probePlan.target}」成功（角度 ${probePlan.slotId}）`
+                : probeOutcome === "miss"
+                  ? `回收「${probePlan.target}」未成（角度 ${probePlan.slotId}）`
+                  : `本轮计划回收「${probePlan.target}」，模型未引出`,
+            detail: probePlan.slotIntent,
+          },
+        ]
+      : []),
     {
       turn,
       agent: "tutor",
@@ -383,6 +443,7 @@ export async function* handleChatStream(input: {
       archiveCard,
       trace,
       profile: profile as Profile,
+      weaknesses: weaknessOverview(),
     },
   }
 }

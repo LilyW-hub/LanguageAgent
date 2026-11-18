@@ -11,7 +11,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-export default function ProfilePanel({ profile }: { profile: Profile }) {
+export default function ProfilePanel({
+  profile,
+  weaknesses = [],
+}: {
+  profile: Profile
+  weaknesses?: Array<{ target: string; status: string; hits: number; misses: number }>
+}) {
   const interests = profile.explicit.interests
 
   return (
@@ -72,18 +78,31 @@ export default function ProfilePanel({ profile }: { profile: Profile }) {
       </Section>
 
       <Section title="学习 Learning">
-        <div className="space-y-1.5">
-          <div>
-            <span className="text-xs text-stone-500">薄弱点：</span>
-            {profile.learning.weaknesses.length > 0 ? (
-              <span className="text-xs text-rose-600">
-                {profile.learning.weaknesses.join("、")}
-              </span>
-            ) : (
-              <span className="text-xs text-stone-400">暂无</span>
-            )}
-          </div>
-        </div>
+        {weaknesses.length === 0 ? (
+          <div className="text-xs text-stone-400">暂无 —— 说错一次后会自动出现在这里</div>
+        ) : (
+          <ul className="space-y-1.5">
+            {weaknesses.map((item) => {
+              const meta =
+                item.status === "resolved"
+                  ? { label: "已掌握", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" }
+                  : item.status === "probing"
+                    ? { label: "回收中", cls: "text-cyan-700 bg-cyan-50 border-cyan-200" }
+                    : { label: "新发现", cls: "text-stone-600 bg-stone-50 border-stone-200" }
+              return (
+                <li
+                  key={item.target}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+                >
+                  <span className="text-xs text-stone-700">{item.target}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${meta.cls}`}>
+                    {meta.label} · 对 {item.hits} / 错 {item.misses}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </Section>
 
       <div className="text-[10px] text-stone-400 leading-relaxed pt-1 border-t border-stone-100">

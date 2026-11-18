@@ -47,6 +47,8 @@ export interface NpcPromptInput {
   history: ChatTurn[]
   userMessage: string
   correction: Correction | null
+  /** 本轮要自然回收的薄弱点（没有则不回收） */
+  probe?: { target: string; slotId: string; slotIntent: string } | null
 }
 
 /** 填好占位符的 NPC system prompt */
@@ -55,7 +57,9 @@ export function npcSystemFilled(input: NpcPromptInput): string {
   const interests = [...profile.explicit.interests, ...profile.inferred.map((item) => item.fact)]
   const corrected =
     correction && correction.errorType !== "none"
-      ? `${correction.corrected}（错误类型：${correction.errorType}）`
+      ? correction.severity === "minor"
+        ? "（对方这句只有小瑕疵，不必当面纠正，正常接话即可）"
+        : `${correction.corrected}（错误类型：${correction.errorType}）`
       : "（本句无明显错误）"
 
   return npcSystemPrompt(npc)
@@ -135,7 +139,7 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
   const { npc, profile } = input
   const interests = [...profile.explicit.interests, ...profile.inferred.map((item) => item.fact)]
 
-  return `${npcSystemPrompt(npc)
+  const base = `${npcSystemPrompt(npc)
     .replace("{LEVEL}", profile.level)
     .replace("{INTERESTS}", formatList(interests))
     .replace("{WEAKNESSES}", formatList(profile.learning.weaknesses))
@@ -149,11 +153,13 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
 {
   "corrected": "把用户原句修正后的英文句子",
   "errorType": "grammar|vocabulary|word_order|pragmatics|none",
+  "severity": "blocking|minor|none",
   "explanation": "一句中文解释",
   "natural": "更地道的英文说法（字符串）",
   "addToReview": true,
   "focus": { "word": "本轮值得复习的词或语法点", "note": "简短说明" },
   "plan": { "step": "${npc.quest.steps.map((item) => item.id).join("|")}", "reason": "为什么停在这一步" },
+  "probe": { "target": "回收的薄弱点", "slot": "使用的角度", "triggered": true, "usedCorrectly": true },
   "tools": [ { "name": "lookup_vocabulary", "args": { "word": "flat white" } } ]
 }
 
@@ -171,6 +177,12 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
   title 必须用中文，格式为「城市·场景·主题」，例如「伦敦·咖啡馆·如何点单」或「伦敦·咖啡馆·过去时说法」。不要用英文标题。
 注意：如果用户这句有语言错误，你通常应该同时调用 schedule_review 与 create_archive。
 
+【severity 怎么判】
+- blocking：说错了会让对方误解意思（时态导致时间混乱、动词形式错、词义用反、语序造成歧义）
+- minor：不影响理解的小瑕疵（冠词、单复数、介词小误用）
+- none：没有错误
+只有 blocking 才值得在回复里自然地复述一次；minor 不必当场纠正。
+
 【纠错判定规则】
 检查用户原句时，逐项核对：① 时态 ② 主谓一致 ③ 冠词 ④ 介词 ⑤ 词序 ⑥ 用词搭配。
 只要任一项有问题，就必须把 errorType 填成对应类别（grammar / vocabulary / word_order / pragmatics），
@@ -178,5 +190,18 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
 - 只处理语法、词汇、语序、语用的错误；**不修改标点与大小写**。
 - 若用户原句没有这类错误：errorType 填 "none"，corrected 与用户原句完全一致，focus 填 null。
 - corrected 必须保留用户原本的标点与大小写。
-- 你在回复里对用户说法的自然复述，必须与 corrected 一致。`
+- 你在回复里对用户自然复述的说法，必须与 corrected 一致。`
+
+  if (!input.probe) return base
+
+  return `${base}
+
+【本轮可自然回收的薄弱点（绝对不要点破）】
+对方过去在「${input.probe.target}」上出过错。请在合适的位置自然地引一次，给他用对的机会。
+建议角度：${input.probe.slotIntent}
+- 绝不说「你上次错过了」「我记得你…」这类话
+- 换一个和上次不同的问法，别让对方觉得被套路
+- 如果话题不合适，可以不引；不要为了回收而硬转话题
+- 他这次用对了就正常接话，不要特意表扬
+- 是否真的引出来了，在 META 的 probe 里如实填写（triggered / usedCorrectly）`
 }

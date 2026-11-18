@@ -60,6 +60,7 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null)
   const [plans, setPlans] = useState<Record<string, QuestPlan>>({})
   const [rewards, setRewards] = useState<Record<string, RewardSummary>>({})
+  const [weaknesses, setWeaknesses] = useState<Array<{ target: string; status: string; hits: number; misses: number }>>([])
 
   // 启动即自检模型连通性，避免演示时才发现 Key/端点/模型名不匹配
   useEffect(() => {
@@ -134,6 +135,7 @@ export default function Home() {
       setTrace([])
       setPlans({})
       setRewards({})
+      setWeaknesses([])
       seedOpening(DEFAULT_NPC_ID)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -233,6 +235,7 @@ export default function Home() {
               if (payload.rewards) {
                 setRewards((prev) => ({ ...prev, [targetNpc]: payload.rewards }))
               }
+              if (payload.weaknesses) setWeaknesses(payload.weaknesses)
               if (payload.correction) setTab("trace")
               if (payload.rewards && payload.rewards.gained > 0) {
                 const bits = [
@@ -294,6 +297,7 @@ export default function Home() {
     setTrace([])
     setPlans({})
     setRewards({})
+    setWeaknesses([])
     setNpcId(DEFAULT_NPC_ID)
     setError(null)
     setTab("profile")
@@ -436,7 +440,7 @@ export default function Home() {
 
         <div className="flex-1 overflow-y-auto">
           {tab === "profile" ? (
-            <ProfilePanel profile={profile} />
+            <ProfilePanel profile={profile} weaknesses={weaknesses} />
           ) : tab === "archive" ? (
             <ArchivePanel entries={archiveEntries} />
           ) : (

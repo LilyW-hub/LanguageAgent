@@ -1,6 +1,6 @@
 import { chatJson } from "../llm"
 import { tutorSystemPrompt } from "../prompts"
-import type { Correction, ErrorType } from "../types"
+import type { Correction, ErrorSeverity, ErrorType } from "../types"
 
 const ERROR_TYPES: ErrorType[] = ["grammar", "vocabulary", "word_order", "pragmatics", "none"]
 
@@ -49,6 +49,13 @@ function normalizeErrorType(value: unknown): ErrorType {
   return "none"
 }
 
+function normalizeSeverity(value: unknown, errorType: ErrorType): ErrorSeverity {
+  if (errorType === "none") return "none"
+  if (value === "minor" || value === "blocking") return value
+  // 模型没给就按「会误解」处理：宁可不纠，也不要漏掉影响意思的错误
+  return "blocking"
+}
+
 export function toCorrection(raw: Record<string, unknown>, userMessage: string): Correction {
   const errorType = normalizeErrorType(raw.errorType)
 
@@ -58,6 +65,7 @@ export function toCorrection(raw: Record<string, unknown>, userMessage: string):
     original: asString(raw.original, userMessage),
     corrected,
     errorType,
+    severity: normalizeSeverity(raw.severity, errorType),
     explanation: asString(raw.explanation, ""),
     natural: asString(raw.natural, corrected),
     addToReview: raw.addToReview !== false && errorType !== "none",
@@ -73,6 +81,7 @@ export async function runTutor(input: { userMessage: string; level: string }): P
     original: input.userMessage,
     corrected: input.userMessage,
     errorType: "none",
+    severity: "none",
     explanation: "",
     natural: input.userMessage,
     addToReview: false,
@@ -97,6 +106,7 @@ export async function runTutor(input: { userMessage: string; level: string }): P
         original: input.userMessage,
         corrected: input.userMessage,
         errorType: "none",
+        severity: "none",
         explanation: "",
         natural: input.userMessage,
         addToReview: false,

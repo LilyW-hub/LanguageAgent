@@ -5,6 +5,7 @@ import type { TraceAgent, TraceStep } from "@/lib/types"
 const AGENT_META: Record<TraceAgent, { icon: string; label: string; color: string }> = {
   memory: { icon: "🧠", label: "memory", color: "#0f766e" },
   plan: { icon: "📋", label: "plan", color: "#7c3aed" },
+  probe: { icon: "🎯", label: "probe", color: "#0e7490" },
   tool: { icon: "🔧", label: "tool", color: "#c2410c" },
   reward: { icon: "⭐", label: "reward", color: "#a16207" },
   tutor: { icon: "🩺", label: "tutor", color: "#b91c1c" },
