@@ -171,6 +171,8 @@ export interface Npc {
   age: number
   profession: string
   personality: string
+  /** 人物介绍显示的简短标签，与完整性格设定分开。 */
+  tags?: string[]
   interests: string[]
   speechStyle: string
   languageLevel: string

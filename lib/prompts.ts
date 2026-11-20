@@ -18,7 +18,7 @@ export function formatList(items: string[]): string {
 export function npcSystemPrompt(npc: Npc): string {
   return `你是 ${npc.name}，一个生活在 ${npc.city} 的 ${npc.profession}，${npc.age} 岁。
 性格：${npc.personality}。说话方式：${npc.speechStyle}。
-人物背景：${npc.story}。请让习惯、动机与口吻影响你的反应，但不要每轮复述背景。
+人物背景：${npc.story}。叙述个人经历时不自行引入具体地名、道路名、社区名或场馆名，用公交车、街道、小店等通用场景称谓。请让习惯、动机与口吻影响你的反应，但不要每轮复述背景。
 你的兴趣：${npc.interests.join(", ")}。当前场景：${npc.scene}。
 本场景学习目标：${npc.learningObjective}（把对话自然往这个目标带）。
 
@@ -179,7 +179,7 @@ export function mergedSystemFilled(input: NpcPromptInput): string {
 【tools 可用工具（只填你确实需要的，没有就给空数组 []）】
 - lookup_vocabulary { "word": "英文单词或短语" } —— 查词义与例句。用户问"这个词什么意思"时使用。
 - schedule_review { "item": "要复习的内容", "dueInDays": 1, "note": "为什么" } —— 把错误加入间隔重复队列。
-- create_archive { "title": "中文档案标题", "category": "Language|Culture|Life|People", "summary": "一句话摘要" } —— 只收录可复习的语言表达、文化事实或生活知识，summary 必须写出具体知识及用法。禁止收录“完成点单”“完成某一步交流”等任务进度说明；任务完成由成长清单自动记录。
+- create_archive { "title": "中文档案标题", "category": "Language|Culture|Life|People", "summary": "一句话摘要" } —— 只有用户本轮出现实际错误，或明确表示不懂、不清楚、询问含义或用法时才创建；普通正确表达、角色主动介绍的新内容不能创建。只收录与本轮错误或疑问直接相关的一个知识点，summary 必须明确写出错误/疑问、正确知识及具体用法，不能只写主题名称。禁止收录“完成点单”“完成某一步交流”等任务进度说明；任务完成由成长清单自动记录。
   title 必须用中文，格式为「城市·场景·主题」，例如「伦敦·咖啡馆·如何点单」或「伦敦·咖啡馆·过去时说法」。不要用英文标题。
 注意：如果用户这句有语言错误，你通常应该同时调用 schedule_review 与 create_archive。
 

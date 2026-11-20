@@ -1,12 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Npc } from "@/lib/types"
 
-/**
- * NPC 头像：优先使用 public/avatars/<id>.svg（换成 .png 只需改这一处），
- * 没有图片时回退到 emoji 徽章，保证任何环境都不会出现破图。
- */
+/** 所有角色通过 DiceBear 生成独立头像，由本地接口缓存。 */
 export default function NpcAvatar({
   npc,
   size = 40,
@@ -17,6 +14,7 @@ export default function NpcAvatar({
   ring?: boolean
 }) {
   const [imageFailed, setImageFailed] = useState(false)
+  useEffect(() => setImageFailed(false), [npc.id])
 
   const style = { width: size, height: size }
 
@@ -25,14 +23,14 @@ export default function NpcAvatar({
       className={`shrink-0 rounded-full overflow-hidden flex items-center justify-center ${
         ring ? "ring-2 ring-white shadow-sm" : ""
       }`}
-      style={{ ...style, background: npc.bg }}
+      style={{ ...style, background: "#ecf0f2" }}
     >
       {imageFailed ? (
-        <span style={{ fontSize: Math.round(size * 0.46), lineHeight: 1 }}>{npc.avatarEmoji}</span>
+        <span style={{ fontSize: Math.round(size * 0.46), lineHeight: 1 }}>{npc.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`/avatars/${npc.id}.svg`}
+          src={`/api/npcs/${encodeURIComponent(npc.id)}/avatar?v=dicebear-personas-muted-10`}
           alt={npc.name}
           width={size}
           height={size}

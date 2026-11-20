@@ -5,6 +5,7 @@ export const NPCS: Record<string, Npc> = {
   maya: {
     id: "maya",
     name: "Maya",
+    tags: ["热情", "健谈", "音乐"],
     city: "London",
     scene: "Coffee shop",
     sceneLabel: "咖啡馆",
@@ -18,11 +19,11 @@ export const NPCS: Record<string, Npc> = {
     factBoundary: ["coffee", "London daily life", "music"],
     forbidden: ["politics", "religion"],
     opening: "Morning! What can I get you? I'm Maya by the way.",
-    story: "在伦敦东区长大，大学读了音乐，毕业后回到咖啡店做咖啡师。喜欢在店里放黑胶唱片。",
+    story: "从小喜欢音乐，大学读了音乐，毕业后回到咖啡店做咖啡师。喜欢在店里放黑胶唱片。",
     suggestions: [
       { label: "😈 演示错误句", text: "Yesterday I go to a nice cafe and I meet a friend." },
       { label: "☕ 点一杯", text: "Can I have a flat white, please?" },
-      { label: "💬 聊工作", text: "Do you like working in a coffee shop?" },
+      { label: "黑胶音乐", text: "What records do you like playing in the coffee shop?" },
     ],
     probeSlots: [
       { id: "recent_activity", intent: "问对方最近做了什么" },
@@ -59,6 +60,7 @@ export const NPCS: Record<string, Npc> = {
   leo: {
     id: "leo",
     name: "Leo",
+    tags: ["温和", "好奇", "摄影"],
     city: "London",
     scene: "Street / gallery",
     sceneLabel: "街头 · 画廊",
@@ -72,11 +74,11 @@ export const NPCS: Record<string, Npc> = {
     factBoundary: ["photography", "travel", "art"],
     forbidden: ["politics", "religion"],
     opening: "Hey — you look like someone who notices light. I'm Leo, I shoot around here.",
-    story: "自由摄影师，做了十年街头和旅行题材，最近在拍伦敦老城区拆迁前的样子。",
+    story: "自由摄影师，做了十年街头和旅行题材，最近在拍老街区更新前的样子。",
     suggestions: [
       { label: "😈 演示错误句", text: "Yesterday I go to a gallery and I see a great photo." },
-      { label: "📷 谈兴趣", text: "I like taking photos of old buildings." },
-      { label: "🎨 表达观点", text: "I think street photography is more interesting than studio work." },
+      { label: "摄影故事", text: "I like taking photos of old buildings." },
+      { label: "街头摄影", text: "I think street photography is more interesting than studio work." },
     ],
     probeSlots: [
       { id: "last_shoot", intent: "问对方上一次拍照是什么时候" },

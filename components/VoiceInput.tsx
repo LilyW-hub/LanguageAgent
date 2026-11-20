@@ -209,7 +209,7 @@ export default function VoiceInput({
       disabled={isDisabled}
       title={title}
       aria-label={title}
-      className={`shrink-0 h-[42px] w-[42px] rounded-xl border text-lg transition flex items-center justify-center ${
+      className={`shrink-0 self-stretch min-h-[46px] w-12 rounded-[7px] border text-lg transition flex items-center justify-center ${
         status === "listening"
           ? "bg-rose-500 border-rose-500 text-white animate-pulse"
           : "bg-white border-stone-200 text-stone-600 hover:border-stone-400"

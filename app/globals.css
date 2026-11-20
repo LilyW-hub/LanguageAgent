@@ -74,8 +74,8 @@ button { transition:background-color .15s,color .15s,border-color .15s; }
 .chat-panel > .relative.px-5 { padding:14px 28px 0; }
 .chat-panel > .relative.px-5 > div { background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 14px; }
 .conversation { flex:1;min-height:0;overflow-y:auto;padding:36px clamp(20px,4vw,60px);display:flex;flex-direction:column;gap:24px; }
-.message-row { width:100%;max-width:760px;margin:0 auto; }
-.message-bubble { padding:15px 19px;line-height:1.85;font-size:15px;border-radius:10px;max-width:88%;box-shadow:none!important;overflow-wrap:anywhere; }
+.message-row { width:100%;min-width:0; }
+.message-bubble { padding:15px 19px;line-height:1.85;font-size:15px;border-radius:10px;max-width:min(88%,760px);box-shadow:none!important;overflow-wrap:anywhere; }
 .message-bubble.bg-white { border:1px solid #e0e7ea;color:var(--p-ink);border-bottom-left-radius:2px; }
 .message-bubble.bg-stone-900 { background:var(--p-ink);border-bottom-right-radius:2px; }
 .chat-composer { padding:18px 28px 20px;background:white;border-top:1px solid var(--line);flex-shrink:0; }
@@ -201,3 +201,10 @@ button { transition:background-color .15s,color .15s,border-color .15s; }
 
 .city-screen,.city-wrap { min-height:100svh; }
 .city-wrap { display:flex;flex-direction:column;width:100%; }
+
+/* 可进入城市：固定圆心，只改变圆点和标签的视觉反馈。 */
+.map-city-available .city-pin { transition: box-shadow 180ms ease, background-color 180ms ease; }
+.map-city-available .city-name { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; }
+.map-city-available:is(:hover,:focus-visible) { z-index:10; }
+.map-city-available:is(:hover,:focus-visible) .city-pin { background-color:#fff0b3;box-shadow:0 0 0 8px #fbbf2433,0 0 24px #fbbf2466; }
+.map-city-available:is(:hover,:focus-visible) .city-name { background:#fbbf2433;border-color:#fbbf24;color:#fff0b3; }

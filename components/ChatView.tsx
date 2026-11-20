@@ -177,14 +177,14 @@ export default function ChatView({
             <button
               key={`${npc.id}-${item.label.replace(/^[^a-zA-Z\u4e00-\u9fa5]+/u, "")}`}
               type="button"
-              onClick={() => setDraft(item.text)}
+              onClick={() => { setDraft(item.text); setVoiceMeta(null) }}
               className="text-[11px] px-2.5 py-1 rounded-full border border-stone-200 bg-white text-stone-600 hover:border-stone-400"
             >
               {item.label.replace(/^[^a-zA-Z\u4e00-\u9fa5]+/u, "")}
             </button>
           ))}
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex items-stretch gap-2">
           <VoiceInput
             onText={(text, meta) => {
               setDraft(text)

@@ -116,7 +116,7 @@ curl -X POST localhost:3000/api/mode -d '{"replay":false}' -H 'Content-Type: app
 ## 视觉资产
 
 - **场景背景**：`public/scenes/coffee.svg`、`street.svg`（矢量、离线可用、体积 KB 级）
-- **NPC 头像**：把图片放到 `public/avatars/<id>.png`（如 `maya.png` / `leo.png`）即自动生效；
+- **NPC 头像**：统一使用 DiceBear Personas API，固定角色 seed，采用低饱和配色和浅色背景；
   没有图片时回退到 emoji 徽章，不会出现破图。
 
 ---
@@ -317,3 +317,9 @@ sh scripts/node-env.sh npx tsc --noEmit
 ```sh
 sh scripts/node-env.sh npm run test:learning
 ```
+
+### NPC 头像
+
+所有角色通过 [DiceBear Personas](https://www.dicebear.com/styles/personas/) HTTP API 生成头像。角色 ID 的 SHA256 摘要作为 seed，相同角色保持同一头像，不发送角色姓名、故事或用户资料。图片首次获取后保存到 `.data/avatars/`，并合并同时发生的相同请求；刷新后优先使用本地缓存。
+
+Personas 画风由 Draftbit 创作，使用 CC BY 4.0 授权，页面已注明作者及授权链接；[DiceBear 公共 HTTP 服务](https://www.dicebear.com/how-to-use/http-api/)限非商业使用，商业部署需自托管 API，并通过 `AVATAR_API_BASE_URL` 设置版本根地址（如 `https://avatars.example.com/10.x`）。服务失败时显示角色姓名首字母，避免退回旧的模板头像。

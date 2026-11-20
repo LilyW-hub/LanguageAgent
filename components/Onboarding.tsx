@@ -1,9 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import type { Level, Profile } from "@/lib/types"
+import type { Level } from "@/lib/types"
 
 const LEVELS: Level[] = ["A0", "A1", "A2", "B1", "B2"]
+const LEVEL_DETAILS: Record<Level, { title: string; description: string }> = {
+  A0: { title: "零基础", description: "刚开始学英语，认识少量单词，还难以用完整句子交流。" },
+  A1: { title: "入门", description: "能打招呼、介绍自己，借助对方放慢语速回答简单问题。" },
+  A2: { title: "基础交流", description: "能在点餐、购物、问路等熟悉场景中进行简短交流。" },
+  B1: { title: "独立交流", description: "能应对多数旅行场景，聊经历、兴趣和计划，并简单说明理由。" },
+  B2: { title: "较熟练交流", description: "能较流畅地讨论多种话题，清楚表达观点，并解释或比较不同选择。" },
+}
 
 const INTEREST_OPTIONS = [
   "photography",
@@ -76,15 +83,16 @@ export default function Onboarding({
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-stone-700">当前英语水平</label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <fieldset>
+            <legend className="text-sm font-medium text-stone-700">当前英语水平</legend>
+            <p className="mt-1 text-xs text-stone-500">按你目前能完成的交流选择即可，不确定时可以先选低一级。</p>
+            <div className="mt-2 flex gap-2">
               {LEVELS.map((item) => (
                 <button
                   key={item}
                   type="button"
-                  aria-pressed={level === item} onClick={() => setLevel(item)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                  aria-pressed={level === item} aria-describedby="english-level-description" onClick={() => setLevel(item)}
+                  className={`flex-1 min-w-0 px-2 py-2 rounded-lg text-sm border transition text-center ${
                     level === item
                       ? "bg-stone-900 text-white border-stone-900"
                       : "bg-white text-stone-600 border-stone-200 hover:border-stone-400"
@@ -94,9 +102,13 @@ export default function Onboarding({
                 </button>
               ))}
             </div>
-          </div>
+            <div id="english-level-description" aria-live="polite" aria-atomic="true" className="mt-2 text-sm leading-relaxed">
+              <p className="font-medium text-stone-700">{level} · {LEVEL_DETAILS[level].title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-stone-500">{LEVEL_DETAILS[level].description}</p>
+            </div>
+          </fieldset>
 
-          <div>
+          <div className="!mt-3">
             <label htmlFor="learning-goal" className="text-sm font-medium text-stone-700">学习目标</label>
             <input
               id="learning-goal"
