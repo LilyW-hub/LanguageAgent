@@ -140,9 +140,14 @@ function parseMeta(raw: string, userMessage: string): MetaBundle {
 /** 判断这句话是否构成「完成这一步」的证据 */
 function stepEvidence(step: { cues?: string[]; minWords?: number }, message: string): boolean {
   const text = message.toLowerCase()
-  if (step.minWords && text.split(/\s+/).filter(Boolean).length >= step.minWords) return true
-  if (!step.cues || step.cues.length === 0) return true
-  return step.cues.some((cue) => text.includes(cue))
+  if (/不懂|不清楚|不明白|什么意思|don.t understand|not sure|confused/i.test(text)) return false
+  if (!step.cues || step.cues.length === 0) return false
+  return step.cues.some((cue) => {
+    const normalized = cue.toLowerCase().trim()
+    if (!normalized) return false
+    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    return new RegExp(`(?:^|[^a-z])${escaped}(?:$|[^a-z])`, "i").test(text)
+  })
 }
 
 /**
@@ -177,7 +182,7 @@ function resolvePlan(
 
   const advanced = targetIndex > currentIndex
   const index = advanceQuest(npc.id, targetIndex)
-  const step = steps[Math.min(index, steps.length - 1)]!
+  const step = steps[Math.max(0, Math.min(index, steps.length - 1))]!
 
   return {
     plan: { stepId: step.id, stepLabel: step.label, index, total: steps.length },
@@ -254,7 +259,10 @@ export async function* handleChatStream(input: {
   const { plan, advanced, blockedBy } = resolvePlan(npc, meta.planStep, meta.planReason, input.message)
 
   // ── 工具：模型申请 + 学习闭环兜底 ──
-  const calls: ToolCall[] = [...meta.tools]
+  const userUnclear = /不懂|不明白|不清楚|不知道|什么意思|怎么说|怎么用|有什么区别|what does .+ mean|what is .+|how (?:do|can|should) (?:i|we)|(?:don[’']t|do not) (?:know|understand)|not sure|confused/i.test(input.message)
+  const calls: ToolCall[] = meta.tools.filter(call =>
+    call.name !== "create_archive" || correction.errorType !== "none" || userUnclear,
+  )
 
   // 任务推进仅写入成长记录；档案保留模型提炼的实际知识。
   if (correction.errorType !== "none") {

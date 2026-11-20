@@ -479,6 +479,7 @@ export default function Home() {
 
         <div className="px-4 py-2 border-t border-stone-200 text-[10px] text-stone-400">
           每一段对话，都有迹可循。
+          <div className="mt-1">头像：<a href="https://personas.draftbit.com/" target="_blank" rel="noreferrer" className="underline">Personas by Draftbit</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></div>
         </div>
       </aside>
       </div>

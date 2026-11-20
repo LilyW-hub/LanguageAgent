@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CITIES, type CityNode } from "@/lib/world"
+import { coverMapSize } from "@/lib/mapGeometry"
 
 /**
  * 世界地图：文明档案员的出发点。
@@ -23,6 +24,22 @@ export default function WorldMap({
   onEnterLondon: () => void
 }) {
   const [hint, setHint] = useState<string | null>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const resize = () => {
+      const { width, height } = viewport.getBoundingClientRect()
+      setMapSize(coverMapSize(width, height))
+    }
+    resize()
+    const observer = new ResizeObserver(resize)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
+
 
   function handleClick(city: CityNode) {
     if (city.unlocked) {
@@ -37,15 +54,53 @@ export default function WorldMap({
 
   return (
     <div id="main-content" className="relative min-h-screen overflow-hidden bg-[#14110F] text-stone-100">
-      {/* 地图底图 */}
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-90"
-        style={{ backgroundImage: "url(/scenes/world.svg)" }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+      {/* 底图和节点共享 cover 后的画布，不能分别相对窗口定位。 */}
+      <div ref={viewportRef} className="absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{ width: mapSize?.width ?? "100%", height: mapSize?.height ?? "100%", visibility: mapSize ? "visible" : "hidden" }}>
+          <div className="absolute inset-0 opacity-90"
+            style={{ backgroundImage: "url(/scenes/world.svg)", backgroundSize: "100% 100%" }} />
+      {/* 城市节点 */}
+      <div className="absolute inset-0">
+        {CITIES.map((city) => {
+          const active = city.unlocked
+          return (
+            <button
+              key={city.id}
+              data-city-id={city.id}
+              type="button"
+              onClick={() => handleClick(city)}
+              className={`map-city absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 group ${active ? "map-city-available" : ""}`}
+              style={{ left: `${city.x}%`, top: `${city.y}%` }}
+            >
+              <span
+                className={`city-pin absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 block rounded-full transition ${
+                  active
+                    ? "h-3 w-3 bg-amber-300 ring-4 ring-amber-400/25 group-hover:ring-amber-400/50"
+                    : "h-2 w-2 bg-stone-500 group-hover:bg-stone-300"
+                }`}
+              />
+              <span
+                className={`city-name absolute left-[calc(50%+10px)] top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] px-2 py-0.5 rounded ${
+                  active
+                    ? "bg-amber-400/15 text-amber-200 border border-amber-400/30"
+                    : "bg-black/40 text-stone-400 border border-white/10"
+                }`}
+              >
+                {city.name}
+                {!active && <span className="ml-1 opacity-60">🔒</span>}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+        </div>
+      </div>
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/40 via-transparent to-black/70" />
 
       {/* 顶部：使命 */}
-      <header className="relative px-10 pt-9 flex items-start justify-between gap-8">
+      <header className="relative pointer-events-none px-10 pt-9 flex items-start justify-between gap-8">
         <div>
           <div className="text-[11px] tracking-[0.3em] text-amber-400/80">
             CIVILIZATION TRANSFER PROGRAM
@@ -82,42 +137,8 @@ export default function WorldMap({
         </div>
       </header>
 
-      {/* 城市节点 */}
-      <div className="absolute inset-0">
-        {CITIES.map((city) => {
-          const active = city.unlocked
-          return (
-            <button
-              key={city.id}
-              type="button"
-              onClick={() => handleClick(city)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 group"
-              style={{ left: `${city.x}%`, top: `${city.y}%` }}
-            >
-              <span
-                className={`block rounded-full transition ${
-                  active
-                    ? "h-3 w-3 bg-amber-300 ring-4 ring-amber-400/25 group-hover:ring-amber-400/50"
-                    : "h-2 w-2 bg-stone-500 group-hover:bg-stone-300"
-                }`}
-              />
-              <span
-                className={`absolute left-4 top-[-6px] whitespace-nowrap text-[11px] px-2 py-0.5 rounded ${
-                  active
-                    ? "bg-amber-400/15 text-amber-200 border border-amber-400/30"
-                    : "bg-black/40 text-stone-400 border border-white/10"
-                }`}
-              >
-                {city.name}
-                {!active && <span className="ml-1 opacity-60">🔒</span>}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
       {/* 底部：入口 */}
-      <footer className="absolute inset-x-0 bottom-0 px-10 pb-9 flex items-end justify-between">
+      <footer className="absolute pointer-events-none inset-x-0 bottom-0 px-10 pb-9 flex items-end justify-between">
         <div className="text-[11px] text-stone-400/80 leading-relaxed">
           <div>🌍 当前开放：伦敦 · {peopleCount} 位当地人</div>
           <div className="mt-1 text-stone-500">
@@ -128,14 +149,14 @@ export default function WorldMap({
         <button
           type="button"
           onClick={onEnterLondon}
-          className="rounded-xl bg-amber-400 px-6 py-3 text-sm font-semibold text-stone-900 hover:bg-amber-300 transition"
+          className="pointer-events-auto rounded-xl bg-amber-400 px-6 py-3 text-sm font-semibold text-stone-900 hover:bg-amber-300 transition"
         >
           出发去伦敦 →
         </button>
       </footer>
 
       {hint && (
-        <div className="absolute left-1/2 bottom-28 -translate-x-1/2 rounded-lg border border-white/10 bg-black/70 px-4 py-2 text-xs text-amber-200 backdrop-blur">
+        <div role="status" className="absolute pointer-events-none left-1/2 bottom-28 -translate-x-1/2 rounded-lg border border-white/10 bg-black/70 px-4 py-2 text-xs text-amber-200 backdrop-blur">
           {hint}
         </div>
       )}

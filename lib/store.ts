@@ -161,13 +161,13 @@ export function rescheduleDueReviews(now = Date.now()): number {
 export function advanceQuest(npcId: string, stepIndex: number): number {
   const current = getQuestStep(npcId)
   const next = Math.max(current, stepIndex)
-  recordGrowth(npcId, next)
+  if (next > current) recordGrowth(npcId, next)
   store.questStep[npcId] = next
   return next
 }
 
 export function getQuestStep(npcId: string): number {
-  return store.questStep[npcId] ?? getGrowth().find(item => item.npcId === npcId)?.index ?? 0
+  return store.questStep[npcId] ?? getGrowth().find(item => item.npcId === npcId)?.index ?? -1
 }
 
 export function addXp(amount: number): number {

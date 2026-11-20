@@ -1,6 +1,7 @@
 "use client"
 
 import NpcAvatar from "./NpcAvatar"
+import { getNpcTags } from "@/lib/npcTags"
 import type { Npc } from "@/lib/types"
 
 /**
@@ -8,10 +9,7 @@ import type { Npc } from "@/lib/types"
  * 展示预设角色或模型生成并保存的角色资料。
  */
 export default function PersonaCard({ npc, onClose }: { npc: Npc; onClose: () => void }) {
-  const traits = npc.personality
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const traits = getNpcTags(npc)
 
   return (
     <div className="relative px-5 py-4 border-b border-stone-200 bg-white/95 backdrop-blur">
@@ -49,15 +47,7 @@ export default function PersonaCard({ npc, onClose }: { npc: Npc; onClose: () =>
                 {trait}
               </span>
             ))}
-            {npc.interests.map((interest) => (
-              <span
-                key={interest}
-                className="text-[10px] px-2 py-0.5 rounded-full border"
-                style={{ borderColor: npc.accent, color: npc.accent }}
-              >
-                {interest}
-              </span>
-            ))}
+
           </div>
 
           <div className="mt-2 flex items-center gap-3 text-[10px] text-stone-500">
